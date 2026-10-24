@@ -141,3 +141,10 @@ def test_log_keeps_content_when_roasted(monkeypatch, tmp_path):
 def test_log_file_is_owner_only(monkeypatch, tmp_path):
     seen = run_main(monkeypatch, tmp_path, checks=1)
     assert seen["log_path"].stat().st_mode & 0o777 == 0o600
+
+
+def test_screen_description_stays_out_of_redirected_stdout(monkeypatch, tmp_path, capsys):
+    # The packaged app sends stdout to apex.log; only a live terminal should see what was on screen.
+    seen_text = {**WORKING, "content": "private chat with Sam about rent"}
+    run_main(monkeypatch, tmp_path, checks=1, verdict=seen_text)
+    assert "private chat" not in capsys.readouterr().out

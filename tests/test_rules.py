@@ -92,3 +92,9 @@ def test_live_reload(tmp_path):
 
     os.utime(p, (time.time() + 5, time.time() + 5))
     assert rr.current()["distracting"] == ["reddit"]
+
+
+def test_search_query_is_not_a_visit():
+    r = rules.parse("[distracting]\nreddit\n")
+    assert rules.match(r, "Safari", "https://www.google.com/search?q=reddit+python") is None
+    assert rules.match(r, "Safari", "https://www.reddit.com/r/python/") == ("distracted", "reddit")
