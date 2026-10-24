@@ -23,21 +23,49 @@ Demo video and landing page: https://kgorle1111.github.io/ApexCompanion/
 1. Download **ApexCompanion.zip** from [Releases](https://github.com/kgorle1111/ApexCompanion/releases/latest).
 2. Unzip it and drag **ApexCompanion** into Applications.
 3. Open it. macOS warns you because the app is not notarized: click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway** (first time only; on macOS 15 and later, right-click → Open no longer gets you past this).
-4. Pick your coach.
+4. Pick your coach. It remembers your pick; choose **Switch persona** to change it.
+5. Say what you're working on and pick a length: 25, 50 or 90 minutes, or no limit.
+6. Look at your menu bar: **◉ 0m** means it's watching. The number counts your focused minutes.
 
 Step-by-step install and permissions guide: [INSTALL.md](INSTALL.md).
 
 **Requirements:** Apple Silicon Mac (M1 or later), macOS 14 or newer, 16 GB of RAM (not recommended on 8 GB Macs: we measured 11.2 GB peak memory, so it swaps), and about 12 GB of free disk (setup plus the 8.3 GB model; the launcher wants 10 GB still free after setup). First run needs internet: it downloads uv, Python with about 850 MB of packages, and the model. After that it makes no network calls.
 
-It has no window: it talks through notifications. Open the app again to stop it, switch coach, or edit your sites. It speaks out loud and names what's on your screen, so mute your Mac (or run from source with `--mute`) in shared spaces.
+It has no window: it lives in the menu bar and talks through notifications. Pause, mute, stop, or edit your sites from the menu bar (opening the app again still works too). It speaks out loud and names what's on your screen, so pick **Mute voice** in the menu bar (or run from source with `--mute`) in shared spaces.
 
 Built for watching yourself: no accounts, no remote reporting. Install it only on your own Mac.
 
 Developers can also [run it from source](#run-from-source).
 
+## The menu bar
+
+The menu bar title shows what the coach is doing:
+
+| Title | Meaning |
+|---|---|
+| `◉ 23m` | in a session, 23 minutes focused |
+| `⏸` | paused |
+| `in a call` | a call app or meeting tab is in front, so it's not watching |
+| `🔇` | voice muted |
+| `◉ Apex` | idle, no session running |
+
+The menu:
+
+- **Working on: *your goal*** and **Focused 23 of 50 min**
+- **Pause 15 minutes** / **Resume**: while paused it takes no screenshots and runs no model.
+- **Mute voice** / **Unmute**: silences the voice; notifications still show.
+- **Edit my sites…**: opens your site list (see [Your sites, your rules](#your-sites-your-rules)).
+- **Stop session**: ends the session and shows your summary.
+- **Start a session…** (when idle): asks for a goal and a length.
+- **Quit ApexCompanion**
+
 ## What it does
 
-Every 10 seconds it checks what you're doing. If one of your site rules matches the frontmost app or the browser tab's URL, that decides. Otherwise Gemma 4 describes a screenshot and code decides whether you're working. Two distracted checks in a row and your coach speaks up: a one- or two-line roast, in character, that names what you're actually looking at. While you work, it stays quiet.
+You start a session by saying what you're working on and how long (25, 50 or 90 minutes, or no limit). Every 10 seconds it checks what you're doing. If one of your site rules matches the frontmost app or the browser tab's URL, that decides. Otherwise Gemma 4 describes a screenshot and code decides whether you're working. Two distracted checks in a row and your coach speaks up: a one- or two-line roast, in character, that names what you're actually looking at and reminds you what you said you'd be working on. When the time is up, the session ends and shows your summary.
+
+- **Quiet while you work.** No praise out loud: it used to speak up every ~5 minutes of focus, which interrupted the focus it's there to protect. Your focus shows in the end-of-session summary instead.
+- **Quiet during calls.** While Zoom, Microsoft Teams, FaceTime, Webex, Around, Tuple, or a Google Meet, Zoom web or Teams meeting tab is in front, it takes no screenshot and says nothing.
+- **Your goal is for the coach, not the classifier.** It shows in the menu and in roasts, but it never changes how the screen is classified, so the eval numbers below still apply.
 
 Nothing leaves the machine while it runs. Once setup is done, pull the Wi-Fi and it keeps running.
 
@@ -79,6 +107,8 @@ Side effects of running locally: it's free, and after setup it works on a plane.
                                                                └──────────────────┘
  Ctrl-C ──▶ session stats: length, checks, % focused, call-outs
 ```
+
+Before any of this, if a call app or meeting tab is in front, the check is skipped: no screenshot, no model call, no line spoken. Pause skips checks the same way.
 
 Before the vision call, your site rules check the frontmost app and the active tab's URL. On a rule hit, the vision model is skipped for that check (see [Your sites, your rules](#your-sites-your-rules)).
 
@@ -128,7 +158,7 @@ Two original archetypes, not impressions of any real person or character, picked
 - **The Closer** (`--persona closer`): an arrogant, razor-witty dealmaker who treats you like the associate about to blow the deal.
 - **The Whip** (`--persona whip`): a cold, slow-talking political operator who speaks in unsettling metaphors.
 
-Each persona is a prompt, a few example lines, and a built-in macOS voice, in `personas.py`. Repeat offenses escalate: the second call-out in a session is sharper than the first, and from the third on it counts out loud. Stay on task long enough (30 working checks in a row by default) and you get a rare line of praise. Every spoken line passes a word filter: if a line contains a slur or injected instructions, it's replaced with a fixed safe line.
+Each persona is a prompt, a few example lines, and a built-in macOS voice, in `personas.py`. Repeat offenses escalate: the second call-out in a session is sharper than the first, and from the third on it counts out loud. Praise is off by default (`--praise-every 0`), so a focused stretch stays quiet; `--praise-every N` brings it back after N working checks in a row. Roasts can also mention the goal you set ("you said you'd be working on…"). Every spoken line passes a word filter: if a line contains a slur or injected instructions, it's replaced with a fixed safe line.
 
 ## Design decision: the model never says "distracted"
 
@@ -176,12 +206,12 @@ Grant screen access: **System Settings → Privacy & Security → Screen Recordi
 Run:
 
 ```bash
-HF_HUB_OFFLINE=1 .venv/bin/python apex.py --persona closer
+HF_HUB_OFFLINE=1 .venv/bin/python apex.py --persona closer --goal "finish the lab report" --minutes 50
 ```
 
 Swap `closer` for `whip` to change the voice. Turn your volume up. Ctrl-C ends the session and prints your stats.
 
-Useful flags: `--interval` (seconds between checks, default 10), `--streak` (distracted checks before a roast, default 2), `--cooldown` (seconds between roasts, default 60), `--praise-every` (0 turns praise off), `--mute`, `--once` (one check, print, exit), `--image FILE` (classify a file instead of the screen; repeatable), `--sites FILE` (path to your site list; defaults to `sites.txt` next to `apex.py`).
+Useful flags: `--interval` (seconds between checks, default 10), `--streak` (distracted checks before a roast, default 2), `--cooldown` (seconds between roasts, default 60), `--goal` (what you're working on; shown in the menu and used in roasts, never in classification), `--minutes` (session length; the session ends and prints your summary when it's up), `--state-dir` (where `state.json` and `control.json` live, for the menu bar), `--praise-every` (spoken praise after N working checks in a row; default 0, off), `--mute`, `--once` (one check, print, exit), `--image FILE` (classify a file instead of the screen; repeatable), `--sites FILE` (path to your site list; defaults to `sites.txt` next to `apex.py`).
 
 ## Measured numbers
 
@@ -249,7 +279,9 @@ To read it:
 .venv/bin/python report.py --json     # for scripts
 ```
 
-The report shows focus %, roasts, how often a site rule decided the check, how often the word filter fired, error and unparsed-output rates, and p50/p95 for each stage. The app shows the same summary when you stop it. This is also where real end-to-end latency comes from: the 0.87 s figure above is the classify step alone, and `total` in a live session includes the screenshot.
+The report shows focus %, roasts, how often a site rule decided the check, how often the word filter fired, error and unparsed-output rates, and p50/p95 for each stage. The app shows the same summary when you stop it or the session time runs out. This is also where real end-to-end latency comes from: the 0.87 s figure above is the classify step alone, and `total` in a live session includes the screenshot.
+
+The menu bar and the coach talk through two small local files, `state.json` and `control.json`, in `~/Library/Application Support/ApexCompanion` (owner-only; `--state-dir` changes the folder). Nothing leaves the Mac.
 
 ## Limitations
 
@@ -266,6 +298,15 @@ The report shows focus %, roasts, how often a site rule decided the check, how o
 - **Rules are word matches.** A rule like `news` matches any app name or tab URL containing that word. Keep entries specific.
 - **It's a nudge, not a blocker.** It won't stop you from opening anything. That's deliberate, but it means it only works if you leave it running.
 - **No automatic fallback.** The Ollama build of Gemma 4 we had takes no image input, which is why vision runs through `mlx-vlm`. Gemma 3 vision via Ollama worked in a quick test, but that path isn't wired into `apex.py`.
+
+## What's next
+
+- A one-click "That was work" correction from the notification.
+- Skip the vision model when the front app or page hasn't changed: fewer model calls and better battery, with battery drain measured.
+- Capture every display, not just the main one.
+- Evaluate on real desktop and native-app screenshots, labeled by someone other than the author.
+- A domain-only baseline, to show what vision adds over site rules alone.
+- A notarized build with bundled Python, for a shorter first run.
 
 ## License
 
