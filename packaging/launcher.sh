@@ -101,6 +101,20 @@ coach_pid() {
     return 1
 }
 
+show_summary() {  # the session's numbers, read from its own log; never fatal
+    local s
+    s="$(cd "$WORK" 2>/dev/null && "$PY" report.py --dir "$LOGDIR" 2>/dev/null)"
+    if [ -n "$s" ]; then
+        dialog "Coach stopped. Your session:
+
+$s
+
+Open ApexCompanion to start again." "OK" "OK" >/dev/null
+    else
+        notify "Coach stopped. Open ApexCompanion to start again."
+    fi
+}
+
 stop_coach() {
     local pid; pid="$(coach_pid)" || { rm -f "$PIDFILE"; return 0; }
     touch "$APEX_HOME/stop.$pid"   # tells the launcher hosting this coach that we stopped it on purpose
@@ -126,7 +140,7 @@ control_menu() {
         "Stop" "Switch persona" "Edit my sites" "Keep going")"
     log "control menu: '${pick}' (pid $pid)"
     case "$pick" in
-        "Stop") stop_coach; notify "Coach stopped. Open ApexCompanion to start again." ;;
+        "Stop") stop_coach; show_summary ;;
         "Switch persona") stop_coach; start_flow ;;
         "Edit my sites") open_sites ;;
         *) : ;;
@@ -280,7 +294,7 @@ run_coach() {
         [ -n "${MODEL_HF_HOME:-}" ] && export HF_HOME="$MODEL_HF_HOME"
         # APEX_SCREEN_OK: this app already passed the CoreGraphics preflight; skip apex.py's swift check,
         # which would prompt to install developer tools on Macs without them.
-        export HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1 APEX_SCREEN_OK=1
+        export HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1 APEX_SCREEN_OK=1 APEX_LOG_DIR="$LOGDIR"
         exec /bin/sh -c 'echo $$ > "$1"; echo $$ > "$2"; shift 2; exec "$@"' sh \
             "$PIDFILE" "$APEX_HOME/run.$$" "$PY" "${args[@]}" >> "$LOGDIR/apex.log" 2>&1
     )
