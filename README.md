@@ -27,7 +27,7 @@ Demo video and landing page: https://kgorle1111.github.io/ApexCompanion/
 
 Step-by-step install and permissions guide: [INSTALL.md](INSTALL.md).
 
-**Requirements:** Apple Silicon Mac (M1 or later), macOS 14 or newer, 16 GB of RAM (not recommended on 8 GB Macs: we measured 11.2 GB peak memory, so it swaps), and about 12 GB of free disk (setup plus the 8.3 GB model; the launcher wants 10 GB still free after setup). First run needs internet: it downloads uv, Python with about 850 MB of packages, and the model. After that it makes no network calls.
+**Requirements:** Apple Silicon Mac (M1 or later), macOS 14 or newer, 24 GB of RAM recommended (measured peak footprint 11.3 GB, so a 16 GB Mac works but swaps with a browser and editor open; 8 GB is not recommended), and about 12 GB of free disk (setup plus the 8.3 GB model; the launcher wants 10 GB still free after setup). First run needs internet: it downloads uv, Python with about 850 MB of packages, and the model. After that it makes no network calls.
 
 It has no window: it talks through notifications. Open the app again to stop it, switch coach, or edit your sites. It speaks out loud and names what's on your screen, so mute your Mac (or run from source with `--mute`) in shared spaces.
 
@@ -193,7 +193,7 @@ Measured on an M3 Max, `mlx-community/gemma-4-e4b-it-8bit`, `mlx-vlm 0.7.10`, of
 | First classify call | **2.6 s** | includes warm-up |
 | Vision classify call only, warm | **p50 0.87 s, p95 0.96 s** (batch 1); **p50 0.78 s, p95 0.94 s** (batch 2) | model already loaded; excludes `screencapture` and resize |
 | Roast generation | **0.57 to 0.79 s** | |
-| Peak memory | **11.2 GB** | CLI cold run |
+| Peak memory | **11.3 GB** footprint | `/usr/bin/time -l` over a 306-check soak; steady state 8.6–8.9 GB, no growth seen in 5 min |
 | End-to-end check | 2 distracted checks → spoken roast | worked once, on a synthetic image |
 | **Batch 2, blind** (23 pages, never tuned on) | **15/16** clear-cut (Wilson 95% interval about 72% to 99%), **21/23** overall, 0 false roasts on clear-cut pages | the headline; captured after prompt tuning finished; labels not reviewed by a person |
 | Batch 2 distracted recall, clear-cut | **6/7** | exactly at the 0.85 gate |
@@ -257,7 +257,7 @@ The report shows focus %, roasts, how often a site rule decided the check, how o
 - **Fail-open categories hide misses.** Anything filed under "other", or misfiled into a working category, counts as working and is never roasted. In the blind batch, a Shorts clip went to `educational_video` and a Page Six gossip page to `news_reading`. The built-in Shorts rule now covers the first case in supported browsers.
 - **Small eval, one labeler.** 16 blind clear-cut cases is a small set; one miss is about 6 points. The labeler is the author, and batch-2 labels have not been reviewed by a person.
 - **Not reproducible from the repo.** Labels and results are committed; the screenshots are not (third-party pages).
-- **Heavy for a background app.** 11.2 GB peak memory, and a vision call every 10 seconds. Expect trouble on Macs with little unified memory, and expect it to cost more battery than a text-first approach.
+- **Heavy for a background app.** 11.3 GB peak memory footprint, and a vision call every 10 seconds. Expect trouble on Macs with little unified memory, and expect it to cost more battery than a text-first approach.
 - **Mac only.** `screencapture`, `sips`, `osascript`, `say`, and MLX are all macOS / Apple Silicon.
 - **It sees one screen, once every 10 seconds.** It can miss short distractions, and on multiple displays it only judges what `screencapture` captures.
 - **Context is a single frame.** A lecture on YouTube with a cat thumbnail in the sidebar, or gameplay footage you're watching for work, can be misread. Fail-open defaults and the 2-check debounce reduce false roasts; they don't eliminate them.
