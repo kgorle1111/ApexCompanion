@@ -2,7 +2,7 @@
 # Build dist/ApexCompanion.app + dist/ApexCompanion.zip from the repo. Run from anywhere:
 #   bash packaging/build_app.sh
 # Needs (build machine only): swiftc (Xcode Command Line Tools). Optional: the repo .venv with
-# Pillow for the icon. End users need none of this.
+# Pillow for the icon (or APEX_BUILD_PY=/path/to/python). End users need none of this.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -27,10 +27,11 @@ cp "$PKG/launcher.sh" "$PKG/constraints.txt" "$APP/Contents/Resources/"
 chmod +x "$APP/Contents/Resources/launcher.sh"
 
 ICON_KEY=""
-if [ -x "$ROOT/.venv/bin/python" ] && "$ROOT/.venv/bin/python" -c "import PIL" 2>/dev/null; then
+ICON_PY="${APEX_BUILD_PY:-$ROOT/.venv/bin/python}"   # override for worktrees without their own .venv
+if [ -x "$ICON_PY" ] && "$ICON_PY" -c "import PIL" 2>/dev/null; then
     echo "→ drawing icon"
     TMP="$(mktemp -d)"
-    "$ROOT/.venv/bin/python" "$PKG/make_icon.py" "$TMP/icon.png"
+    "$ICON_PY" "$PKG/make_icon.py" "$TMP/icon.png"
     mkdir "$TMP/AppIcon.iconset"
     for s in 16 32 128 256 512; do
         sips -z $s $s "$TMP/icon.png" --out "$TMP/AppIcon.iconset/icon_${s}x${s}.png" >/dev/null
@@ -40,7 +41,7 @@ if [ -x "$ROOT/.venv/bin/python" ] && "$ROOT/.venv/bin/python" -c "import PIL" 2
     rm -rf "$TMP"
     ICON_KEY="<key>CFBundleIconFile</key><string>AppIcon</string>"
 else
-    echo "→ skipping icon (no repo .venv with Pillow)"
+    echo "→ skipping icon (no Python with Pillow at $ICON_PY; set APEX_BUILD_PY)"
 fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST
