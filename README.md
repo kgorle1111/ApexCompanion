@@ -1,3 +1,15 @@
+<p align="center">
+  <img src=".github/assets/hero.png" alt="ApexCompanion: your screen has a witness. Gemma 4 watches your screen on your Mac and calls you out loud when you drift." width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/kgorle1111/ApexCompanion/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/kgorle1111/ApexCompanion?label=download&color=ff3b30"></a>
+  <img alt="Platform: Apple Silicon, macOS 14+" src="https://img.shields.io/badge/platform-Apple%20Silicon%20%C2%B7%20macOS%2014%2B-111">
+  <img alt="Model: Gemma 4 E4B on-device" src="https://img.shields.io/badge/model-Gemma%204%20E4B%20%C2%B7%20on--device-111">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-111"></a>
+  <a href="https://kgorle1111.github.io/ApexCompanion/"><img alt="Website" src="https://img.shields.io/badge/site-live-30d158"></a>
+</p>
+
 # ApexCompanion
 
 **A focus coach that watches your screen with Gemma 4, on your laptop, and says it out loud when you drift.**
