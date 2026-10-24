@@ -268,7 +268,8 @@ run_coach() {
     if [ -n "${APEX_TEST_ARGS:-}" ]; then read -r -a extra <<< "$APEX_TEST_ARGS"; args+=("${extra[@]}"); fi
     log "starting coach: ${args[*]} (HF_HOME=${MODEL_HF_HOME:-default})"
     printf '\n===== %s start %s =====\n' "$(date '+%F %T')" "$PERSONA" >> "$LOGDIR/apex.log"
-    notify "Watching as $(persona_name "$PERSONA"). Stay sharp."
+    # The app has no window, so this notification is the only place a new user learns how to stop it.
+    notify "Watching as $(persona_name "$PERSONA"). Open ApexCompanion again to stop or edit your sites."
     # Foreground subshell, exec'd into python: the pid is known for the pidfile, Ctrl-C (SIGINT)
     # still reaches python (bash ignores SIGINT only for background jobs), and the app host keeps
     # running as python's parent for as long as the coach runs.
