@@ -1,14 +1,14 @@
 # Installing ApexCompanion (no coding needed)
 
-ApexCompanion is a focus coach that runs on your Mac. Every 10 seconds it looks at your screen, and if you drift onto something distracting, a coach character calls you out in a notification and out loud. Everything stays on your Mac: screenshots are deleted right after each check, and nothing is uploaded.
+ApexCompanion is a focus coach that runs on your Mac. Every 10 seconds it looks at your screen, and if you drift onto something distracting, a coach character calls you out in a notification and out loud. Everything stays on your Mac: screenshots are deleted right after each check, and nothing is uploaded. It's built for watching yourself: no accounts, no remote reporting. Install it only on your own Mac.
 
 ## What you need
 
 - **A Mac with Apple Silicon** (M1, M2, M3, M4 or newer). Intel Macs won't work.
 - **macOS 14 (Sonoma) or newer.**
-- **About 10 GB of free disk space.** Most of it is the coach's "brain" (an AI model, 8.3 GB), downloaded once.
-- **16 GB of memory or more is recommended.** The coach uses about 11 GB while it runs. It will still try on smaller Macs, but other apps may slow down.
-- **Internet for the first setup only.** After that it works offline.
+- **About 12 GB of free disk space.** Most of it is the coach's "brain" (an AI model, 8.3 GB), downloaded once. Setup checks that 10 GB is still free before that download starts.
+- **16 GB of memory or more.** The coach uses about 11 GB while it runs. On an 8 GB Mac it will badly slow everything down; not recommended.
+- **Internet for the first setup only.** The first run downloads a setup helper (uv), Python with about 850 MB of add-ons, and the 8.3 GB model. After that it makes no network calls and works offline.
 
 ## Install
 
@@ -39,7 +39,8 @@ ApexCompanion has no window. It talks to you through small pop-up boxes and noti
    - Find **ApexCompanion** in the **Screen & System Audio Recording** list.
    - Turn its switch **on**. If macOS offers **Quit & Reopen**, choose it.
    - **Open ApexCompanion again.**
-6. A notification says **"Watching as The Closer. Stay sharp."** It's running. Get to work.
+6. **Let it read your browser's address bar (optional).** The first time you use Safari, Chrome, Arc, Brave or Edge while it runs, macOS asks whether ApexCompanion may **control** that browser. That wording is macOS's; ApexCompanion only reads the web address of the tab you're on, on your Mac, so your site list can match it. If you click **Don't Allow**, your list still matches app names and the coach still watches the screen.
+7. A notification says it's watching as your coach, and that you **open ApexCompanion again to stop it or edit your sites**. It's running. Get to work.
 
 Each time you open it after that, it just asks which coach you want and starts.
 
@@ -50,9 +51,19 @@ Each time you open it after that, it just asks which coach you want and starts.
 - **Stop**: the coach stops.
 - **Switch persona**: pick the other coach.
 - **Edit my sites**: your list opens in TextEdit. Put each site or app on its own line under `[distracting]` (always call me out) or `[ok]` (never call me out). If something is in both lists, **ok wins**. Save the file (⌘S). Changes apply within 10 seconds, with no restart. Lines starting with `#` are just notes and are ignored.
+  - Your list is checked against the app's name and the web address only, never against what's on the page. So use a site or app name (`youtube`), not a YouTube channel name.
+  - YouTube Shorts always counts as distracting, unless you put it under `[ok]`.
 - **Keep going**: closes the menu.
 
 Restarting or logging out of your Mac also stops the coach. Open the app to start it again.
+
+The coach speaks out loud and names what's on your screen. In a shared space (a library, an office, a call), turn your Mac's volume down.
+
+## What it keeps on your Mac
+
+- **Screenshots: none.** Each one is deleted right after its check.
+- **A small log** in `~/Library/Application Support/ApexCompanion/logs`, readable only by your user account. It notes which app you were in, the site's name (for example `youtube.com`, not the full web address), whether you were working, and what the coach said. The model's description of your screen is kept only when the coach called you out.
+- Nothing is sent anywhere. Delete the `logs` folder anytime.
 
 ## Uninstall
 

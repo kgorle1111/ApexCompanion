@@ -64,6 +64,13 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:5
 .btn:focus-visible,.navlinks a:focus-visible{outline:3px solid var(--amber);outline-offset:3px}
 .runline{margin-top:22px;font:13.5px/1.5 var(--mono);color:var(--mute);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-wrap:anywhere}
 .runline b{color:var(--green);font-weight:600}
+.self{margin-top:14px;color:var(--ink);font-size:16px;font-weight:600;max-width:56ch}
+.reqbox{margin-top:20px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;max-width:62ch}
+.reqbox .reqh{font:600 12.5px/1.2 var(--mono);color:var(--mute);margin-bottom:8px}
+.reqbox ul{margin:0;padding-left:18px;display:grid;gap:6px;font-size:14.5px;line-height:1.45;color:var(--mute)}
+.reqbox b{color:var(--ink);font-weight:650}
+.devlbl{margin-top:22px;font:600 12.5px/1.2 var(--mono);color:var(--dim)}
+.devlbl + .runline{margin-top:8px}
 
 /* hero mock */
 .mock{position:relative;min-width:0}
@@ -166,6 +173,8 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:5
 .num-card .what{font-weight:700;font-size:15.5px}
 .num-card .how{color:var(--mute);font-size:13.5px}
 .num-card.pending .big{font-size:16px;letter-spacing:0;line-height:1.3}
+.num-card .big.range{font-size:clamp(30px,3.4vw,44px)}
+.evals{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px}
 .badge{align-self:flex-start;font:700 11.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:5px 7px;border-radius:5px}
 .badge.m{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green)}
 .badge.p{background:var(--tbd-bg);color:var(--tbd-ink)}
@@ -193,7 +202,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
 @media (max-width:760px){
   section{padding:64px 0}
   .hero{padding:44px 0 64px}
-  .vs,.personas,.cfg{grid-template-columns:1fr}
+  .vs,.personas,.cfg,.evals{grid-template-columns:1fr}
   .pipe .h{display:none}
   .pipe .v{display:block;max-width:420px;margin:0 auto}
   .pipe{padding:16px}
@@ -233,13 +242,24 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
   <div class="wrap">
     <div>
       <h1>Your screen<br>has a <em>witness.</em></h1>
-      <p class="lede">ApexCompanion looks at your screen every 10 seconds with Gemma 4, running entirely on your laptop. Drift off task and it calls you out <b>out loud</b>, in the voice of a coach with no patience for you.</p>
+      <p class="lede">ApexCompanion looks at your screen every 10 seconds with Gemma 4, running on your own Mac. Drift off task and it calls you out <b>out loud</b>, in the voice of a coach with no patience for you.</p>
+      <p class="self">Built for watching yourself: no accounts, no remote reporting. Install it only on your own Mac.</p>
       <p class="analogy">A personal trainer who watches every rep <span>and never posts the footage.</span></p>
       <div class="cta">
         <a class="btn" href="https://github.com/kgorle1111/ApexCompanion/releases/latest/download/ApexCompanion.zip">Download for Mac</a>
         <a class="btn ghost" href="#how">See how it works &darr;</a>
-        
       </div>
+      <div class="reqbox" role="note" aria-label="Before you download">
+        <p class="reqh">Before you download</p>
+        <ul>
+          <li><b>Your Mac:</b> Apple silicon (M1 or later), macOS 14 or newer, 16 GB of memory (8 GB Macs: not recommended, it will badly slow your Mac).</li>
+          <li><b>Space:</b> about 8.3 GB one-time download. Keep about 12 GB of disk free.</li>
+          <li><b>First open:</b> macOS will warn you because the app is not notarized. Go to System Settings &rarr; Privacy &amp; Security and click <b>Open Anyway</b>.</li>
+          <li><b>No window:</b> it lives in your notifications. Open the app again to stop it or change your sites.</li>
+          <li><b>Shared spaces:</b> it speaks out loud and names what is on your screen. Mute your Mac when others can hear.</li>
+        </ul>
+      </div>
+      <p class="devlbl">Developers: run from source</p>
       <div class="runline" aria-label="Run command"><b>$</b> HF_HUB_OFFLINE=1 .venv/bin/python apex.py --persona closer</div>
     </div>
 
@@ -282,7 +302,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
   <div class="wrap">
     <div class="kicker">The insight</div>
     <h2>Site blockers see URLs. Gemma sees context.</h2>
-    <p class="lede">The same domain can be your best study tool or your worst habit. A blocklist keyed on URLs or window titles can't tell the difference. Gemma 4 looks at the actual pixels on every check, so it can.</p>
+    <p class="lede">The same domain can be your best study tool or your worst habit. A blocklist keyed on URLs or window titles can't tell the difference. Gemma 4 looks at the actual pixels, so it can.</p>
 
     <div class="vs">
       <div class="panel blocker">
@@ -441,13 +461,14 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
       </svg>
     </div>
     <div>
-      <div class="kicker">Air-gapped by design</div>
+      <div class="kicker">Offline after setup</div>
       <h2>Your screen is the most private thing you own.</h2>
       <p class="lede">A coach that watches your screen can only be trusted if the footage goes nowhere. That's why this has to run on-device, and why an open-weight model makes it possible.</p>
       <ul class="plist">
-        <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Weights load from local cache.</b> Run with <code>HF_HUB_OFFLINE=1</code>; the model never phones home.</span></li>
+        <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>No network calls while it runs.</b> The model loads from local disk (<code>HF_HUB_OFFLINE=1</code>). Setup is the one time it goes online: the first run downloads uv, Python with about 850 MB of packages, and the 8.3 GB model.</span></li>
         <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Screenshots stay on the machine, then get deleted.</b> Each capture is removed after its check. Inference, roast and voice all run locally on Apple silicon.</span></li>
-        <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>The live demo runs with Wi-Fi off.</b> So does this page: no fonts, scripts or images fetched from anywhere.</span></li>
+        <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>A small local log, readable only by you.</b> App name, the site's host (not the full URL), and the screen description only when a roast fires. Delete it anytime.</span></li>
+        <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Keeps running with Wi-Fi off.</b> This page makes no third-party requests either: no outside fonts, scripts or trackers, only its own video and poster.</span></li>
       </ul>
     </div>
   </div>
@@ -457,7 +478,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
 <section id="personas">
   <div class="wrap">
     <div class="kicker">Pick your coach</div>
-    <h2>Two coaches. Zero mercy.</h2>
+    <h2>Two coaches. Zero small talk.</h2>
     <p class="lede">Each roast is generated fresh by Gemma 4 and refers to what's actually on your screen. Switch with one flag.</p>
 
     <div class="personas">
@@ -467,9 +488,9 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
         <p class="who">An arrogant corporate dealmaker. Bills by the minute and thinks you should too.</p>
         <div class="cmd">--persona closer</div>
         <ul class="quotes">
-          <li><span class="ctx">on a cat compilation &middot; real pipeline output</span>Are you actually watching cat videos when I'm trying to close a deal? Focus, or this conversation is over.</li>
-          <li><span class="ctx">on a shopping cart</span>You're comparing sneakers like it's a merger. Nobody's acquiring you at this rate. Close the tab.</li>
-          <li><span class="ctx">after a long focus streak</span>Forty minutes of actual work. Don't let it go to your head. Keep closing.</li>
+          <li><span class="ctx">real output &middot; on a cat compilation</span>Are you actually watching cat videos when I'm trying to close a deal? Focus, or this conversation is over.</li>
+          <li><span class="ctx">sample &middot; on a shopping cart</span>You're comparing sneakers like it's a merger. Nobody's acquiring you at this rate. Close the tab.</li>
+          <li><span class="ctx">sample &middot; after a long focus streak</span>Forty minutes of actual work. Don't let it go to your head. Keep closing.</li>
         </ul>
       </article>
       <article class="persona whip">
@@ -478,13 +499,13 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
         <p class="who">A cold Southern political operator. Soft voice, long memory, counts every vote and every minute.</p>
         <div class="cmd">--persona whip</div>
         <ul class="quotes">
-          <li><span class="ctx">on a social feed</span>Darlin', I've ended careers over less than twenty minutes of scrolling. Put that feed down.</li>
-          <li><span class="ctx">on a game launcher</span>Now I know you didn't open that game on my time. Close it, and we'll pretend I didn't see.</li>
-          <li><span class="ctx">after a long focus streak</span>Well, look at you, actually earning your keep. I'll remember that. I remember everything.</li>
+          <li><span class="ctx">sample &middot; on a social feed</span>Friend, I've ended careers over less than twenty minutes of scrolling. Put that feed down.</li>
+          <li><span class="ctx">sample &middot; on a game launcher</span>Now I know you didn't open that game on my time. Close it, and we'll pretend I didn't see.</li>
+          <li><span class="ctx">sample &middot; after a long focus streak</span>Well, look at you, actually earning your keep. I'll remember that. I remember everything.</li>
         </ul>
       </article>
     </div>
-    <p class="note">Except the line marked as real pipeline output, these are sample lines written for this page to show each voice. Live roasts are generated on-device and vary. Original characters; no real people.</p>
+    <p class="note">Lines marked "sample" were written for this page to show each voice; the line marked "real output" came from the pipeline. Live roasts are generated on-device and vary. Every spoken line passes a word filter: a line with a slur or injected instructions is replaced with a fixed safe line. Original archetypes, not impressions of any real person or character.</p>
   </div>
 </section>
 
@@ -499,20 +520,20 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
       <div class="num-card">
         <span class="badge m">Measured</span>
         <div class="big">0.87<small>s</small></div>
-        <div class="what">Screen check, warm (median)</div>
-        <div class="how">Screenshot to category over 28 real web pages, model already loaded. p95 0.96 s. Well inside the 10 s interval.</div>
+        <div class="what">Vision check (classify only), warm median</div>
+        <div class="how">The Gemma 4 vision call over the 28 tuning-set pages, model already loaded. p95 0.96 s. Excludes taking and resizing the screenshot.</div>
       </div>
       <div class="num-card">
         <span class="badge m">Measured</span>
-        <div class="big">~2.0<small>s</small></div>
+        <div class="big range">0.6&ndash;0.8<small>s</small></div>
         <div class="what">Roast generation</div>
-        <div class="how">Gemma 4 text, persona voice, before it's spoken aloud.</div>
+        <div class="how">Measured 0.57 to 0.79 s. Gemma 4 text, persona voice, before it's spoken aloud.</div>
       </div>
       <div class="num-card">
         <span class="badge m">Measured</span>
-        <div class="big">3.7<small>s</small></div>
+        <div class="big range">3.4&ndash;3.7<small>s</small></div>
         <div class="what">Model load</div>
-        <div class="how">Paid once per session, from local cache, offline.</div>
+        <div class="how">Paid once per session, from local disk, offline.</div>
       </div>
       <div class="num-card">
         <span class="badge m">Measured</span>
@@ -522,11 +543,19 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
       </div>
     </div>
 
-    <div class="num-card" style="margin-top:16px">
-      <span class="badge m">Measured</span>
-      <div class="big">25/25</div>
-      <div class="what">Clear-cut real web pages classified correctly, 0 false roasts</div>
-      <div class="how">28 public pages captured in a headless browser, labels confirmed by a person, run through <code>eval.py</code>. 26/28 overall: both misses were cases labeled ambiguous. Distracted recall 11/11. Held-out 6/6 (5 fully clean).</div>
+    <div class="evals">
+      <div class="num-card">
+        <span class="badge m">Blind test</span>
+        <div class="big">15/16</div>
+        <div class="what">Clear-cut pages right on a batch never used for tuning, 0 false roasts on clear-cut pages</div>
+        <div class="how">23 public pages captured after prompt tuning finished. Wilson 95% interval about 72% to 99%. Distracted recall 6/7, exactly at the 0.85 gate. These labels have not been reviewed by a person yet.</div>
+      </div>
+      <div class="num-card">
+        <span class="badge p">Tuning set</span>
+        <div class="big">25/25</div>
+        <div class="what">Clear-cut pages on the batch used while tuning the prompt</div>
+        <div class="how">28 pages used while tuning, so not a fair test on its own. Both batches pooled: 40/41 clear-cut across 51 pages (95% interval lower bound about 87%). One false roast happened on a page labeled ambiguous, a lofi study stream.</div>
+      </div>
     </div>
 
     <div class="cfg" aria-label="Configured settings, not measurements">
@@ -535,7 +564,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
       <div><b>60 s</b>minimum gap between roasts (setting)</div>
     </div>
 
-    <p class="caveat"><b>Caveat, stated plainly:</b> 25 clear-cut cases is a small set, so one miss would cost 4 points. Only web pages were tested; native desktop apps (VS Code, the terminal, native Spotify, games) are untested, and anything filed as "other" counts as working, so a native game there won't be roasted. We checked the eval can fail: moving <code>entertainment_video</code> or <code>coding</code> to the wrong side of the map turns it red.</p>
+    <p class="caveat"><b>Caveat, stated plainly:</b> 16 blind clear-cut cases is a small set; one miss costs about 6 points. Only web pages captured in a headless browser were tested: no native apps (VS Code, the terminal, native Spotify, games) and no real desktop frames. The labeler is the author. Anything filed as "other", or misfiled into a working category, counts as working and hides the miss: the blind batch's one clear-cut miss was a YouTube Shorts clip filed as <code>educational_video</code>. The repo has the eval labels and results, but not the screenshots (they show third-party pages), so the eval can't be rerun from the repo alone. We checked the eval can fail: moving <code>entertainment_video</code> to the working side fails the recall gate, and moving <code>coding</code> to the distracted side gives 6 false roasts.</p>
   </div>
 </section>
 </main>
@@ -554,13 +583,13 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
         </div>
       </div>
       <div>
-        <h3>Run it</h3>
+        <h3>Developers: run from source</h3>
         <div class="runline" style="margin-top:14px"><b>$</b> HF_HUB_OFFLINE=1 .venv/bin/python apex.py --persona whip</div>
         <p style="margin-top:14px">Needs macOS on Apple silicon and Screen Recording permission for your terminal. Ctrl-C ends the session and prints minutes focused and call-out count.</p>
-        <p style="margin-top:12px">Source code, eval data and install guide: <a href="https://github.com/kgorle1111/ApexCompanion">github.com/kgorle1111/ApexCompanion</a>. Apple Silicon, macOS 14+.</p>
+        <p style="margin-top:12px">Source code, eval labels and results, and install guide: <a href="https://github.com/kgorle1111/ApexCompanion">github.com/kgorle1111/ApexCompanion</a>. Apple Silicon, macOS 14+.</p>
       </div>
     </div>
-    <div class="fine"><span>MIT licensed</span><span>No telemetry</span><span>This page makes zero network requests</span></div>
+    <div class="fine"><span>MIT licensed</span><span>No telemetry</span><span>No third-party requests on this page</span></div>
   </div>
 </footer>
 </body>
