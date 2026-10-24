@@ -27,7 +27,7 @@ Demo video and landing page: https://kgorle1111.github.io/ApexCompanion/
 
 Step-by-step install and permissions guide: [INSTALL.md](INSTALL.md).
 
-**Requirements:** Apple Silicon Mac (M1 or later), macOS 14 or newer, 16 GB of RAM (8 GB Macs are not supported; we measured 11.2 GB peak memory), and about 12 GB of free disk (setup plus the 8.3 GB model; the launcher wants 10 GB still free after setup). First run needs internet: it downloads uv, Python with about 850 MB of packages, and the model. After that it makes no network calls.
+**Requirements:** Apple Silicon Mac (M1 or later), macOS 14 or newer, 16 GB of RAM (not recommended on 8 GB Macs: we measured 11.2 GB peak memory, so it swaps), and about 12 GB of free disk (setup plus the 8.3 GB model; the launcher wants 10 GB still free after setup). First run needs internet: it downloads uv, Python with about 850 MB of packages, and the model. After that it makes no network calls.
 
 It has no window: it talks through notifications. Open the app again to stop it, switch coach, or edit your sites. It speaks out loud and names what's on your screen, so mute your Mac (or run from source with `--mute`) in shared spaces.
 

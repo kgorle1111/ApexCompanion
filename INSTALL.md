@@ -7,7 +7,7 @@ ApexCompanion is a focus coach that runs on your Mac. Every 10 seconds it looks 
 - **A Mac with Apple Silicon** (M1, M2, M3, M4 or newer). Intel Macs won't work.
 - **macOS 14 (Sonoma) or newer.**
 - **About 12 GB of free disk space.** Most of it is the coach's "brain" (an AI model, 8.3 GB), downloaded once. Setup checks that 10 GB is still free before that download starts.
-- **16 GB of memory or more.** The coach uses about 11 GB while it runs. Macs with 8 GB are not supported.
+- **16 GB of memory or more.** The coach uses about 11 GB while it runs. On an 8 GB Mac it will badly slow everything down; not recommended.
 - **Internet for the first setup only.** The first run downloads a setup helper (uv), Python with about 850 MB of add-ons, and the 8.3 GB model. After that it makes no network calls and works offline.
 
 ## Install
