@@ -18,7 +18,7 @@ echo "→ compiling host binary"
 swiftc -O -target arm64-apple-macos14.0 -o "$APP/Contents/MacOS/ApexCompanion" "$PKG/main.swift"
 
 echo "→ copying app files"
-for f in apex.py gemma.py personas.py rules.py; do
+for f in apex.py gemma.py personas.py rules.py report.py; do
     [ -f "$ROOT/$f" ] || { echo "missing $ROOT/$f" >&2; exit 1; }
     cp "$ROOT/$f" "$APP/Contents/Resources/app/"
 done

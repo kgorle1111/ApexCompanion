@@ -3,17 +3,57 @@
 import argparse
 import json
 import os
+import platform
+import resource
 import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
 SHOT_MAX_PX = 1024
-LOG_DIR = Path(__file__).parent / "logs"
+# The packaged app points this at ~/Library/Application Support/ApexCompanion/logs, the folder its docs name.
+LOG_DIR = Path(os.environ.get("APEX_LOG_DIR") or Path(__file__).parent / "logs")
 # The packaged app redirects stdout into a log file; the screen description only goes to a live terminal.
 INTERACTIVE = sys.stdout.isatty()
+SCHEMA = 1  # bump when event fields change; report.py reads it
+
+
+class EventLog:
+    """One JSON object per line, owner-only. Every event carries the session id so a report can group them."""
+
+    def __init__(self, path: Path, session: str):
+        self.session = session
+        # Owner-only from creation: even trimmed, the log says which apps and sites were in front and when.
+        self.f = os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), "a")
+
+    def emit(self, event: str, **fields) -> None:
+        self.f.write(
+            json.dumps({"t": time.time(), "schema": SCHEMA, "session": self.session, "event": event, **fields}) + "\n"
+        )
+        self.f.flush()
+
+    def close(self) -> None:
+        self.f.close()
+
+
+def prune_logs(log_dir: Path, keep_days: float) -> int:
+    cutoff = time.time() - keep_days * 86400
+    removed = 0
+    for old in log_dir.glob("session-*.jsonl"):
+        try:
+            if old.stat().st_mtime < cutoff:
+                old.unlink()
+                removed += 1
+        except OSError:
+            pass  # another instance may be pruning too
+    return removed
+
+
+def peak_rss_mb() -> float:
+    return round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6, 1)  # bytes on macOS
 
 
 @dataclass
@@ -143,6 +183,7 @@ def main() -> None:
         default=os.environ.get("APEX_SITES", str(Path(__file__).parent / "sites.txt")),
         help="your always-distracting / always-OK list (created on first run)",
     )
+    ap.add_argument("--log-days", type=float, default=7.0, help="delete session logs older than this (0 = keep all)")
     args = ap.parse_args()
 
     import personas  # noqa: E402  (after argparse so --help is instant)
@@ -159,42 +200,67 @@ def main() -> None:
     if not args.image:
         require_screen_permission()
 
+    LOG_DIR.mkdir(exist_ok=True)
+    pruned = prune_logs(LOG_DIR, args.log_days) if args.log_days > 0 else 0
+    session = uuid.uuid4().hex[:8]
+    log = EventLog(LOG_DIR / f"session-{time.strftime('%Y%m%d-%H%M%S')}-{session}.jsonl", session)
+    log.emit(
+        "session_start",
+        persona=args.persona,
+        interval_s=args.interval,
+        cooldown_s=args.cooldown,
+        streak=args.streak,
+        mode="replay" if args.image else "screen",
+        python=platform.python_version(),
+        macos=platform.mac_ver()[0],
+        pruned_logs=pruned,
+    )
+
     print("loading Gemma 4 (local, offline)…", flush=True)
     t0 = time.perf_counter()
     import gemma  # noqa: E402
 
     gemma.load_model()
     warm_up(gemma)
-    print(f"model ready in {time.perf_counter() - t0:.1f}s", flush=True)
-
-    LOG_DIR.mkdir(exist_ok=True)
-    log_path = LOG_DIR / f"session-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
-    # Owner-only from creation: even trimmed, the log says which apps and sites were in front and when.
-    log = os.fdopen(os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), "a")
+    load_s = time.perf_counter() - t0
+    print(f"model ready in {load_s:.1f}s", flush=True)
+    log.emit("model_ready", model=gemma.MODEL_ID, load_s=round(load_s, 2), rss_mb=peak_rss_mb())
     coach = Coach(args.streak, args.cooldown, args.praise_every)
     fd, shot = tempfile.mkstemp(prefix="apex_", suffix=".jpg")  # per-run: two instances can't clobber
     os.close(fd)
     images = list(args.image or [])
     started = time.time()
+    n = 0
+    errors = roasts = guarded = 0
 
     try:
         while True:
             tick = time.perf_counter()
             if args.image and not images:
                 break
+            n += 1
+            timing: dict[str, float] = {}
+            stage = "rules"
             try:
+                t = time.perf_counter()
                 app_name = "" if args.image else rules.front_app()
                 url = rules.front_url(app_name) if app_name else ""
                 hit = rules.match(user_rules.current(), app_name, url)
+                timing["rules_s"] = round(time.perf_counter() - t, 4)
                 if hit:  # the user's list beats the model both ways, so no frame is taken or read at all
                     v = {"app": app_name, "content": rules.host(url), "category": "rule", "latency_s": 0.0}
                     v["state"], v["rule"] = hit
                 else:
+                    stage, t = "capture", time.perf_counter()
                     path = images.pop(0) if images else capture(shot)
+                    timing["capture_s"] = round(time.perf_counter() - t, 4)
+                    stage = "classify"
                     v = gemma.classify(path) | {"rule": None}
+                    timing["classify_s"] = v["latency_s"]
             except Exception as e:  # one bad frame must not end a live session
+                errors += 1
                 print(f"{time.strftime('%H:%M:%S')} check failed: {e!r}", file=sys.stderr, flush=True)
-                log.write(json.dumps({"t": time.time(), "error": repr(e)[:300]}) + "\n")
+                log.emit("error", n=n, stage=stage, error=repr(e)[:300])
                 if args.once:
                     break
                 time.sleep(args.interval if not args.image else 0)
@@ -211,25 +277,26 @@ def main() -> None:
             )
 
             line = None
-            if action == "roast":
-                line = personas.clean_line(
-                    gemma.generate_text(
-                        personas.roast_prompt(args.persona, v["app"], v["content"], coach.strikes),
-                        max_tokens=personas.ROAST_MAX_TOKENS,
-                        temperature=personas.ROAST_TEMPERATURE,
-                    ),
-                    persona=args.persona,
-                )
-            elif action == "praise":
-                minutes = round(coach.working_run * args.interval / 60)
-                line = personas.clean_line(
-                    gemma.generate_text(
-                        personas.praise_prompt(args.persona, minutes),
-                        max_tokens=personas.PRAISE_MAX_TOKENS,
-                        temperature=personas.ROAST_TEMPERATURE,
-                    ),
-                    persona=args.persona,
-                )
+            was_guarded = False
+            if action in ("roast", "praise"):
+                if action == "roast":
+                    prompt = personas.roast_prompt(args.persona, v["app"], v["content"], coach.strikes)
+                    max_tokens = personas.ROAST_MAX_TOKENS
+                else:
+                    minutes = round(coach.working_run * args.interval / 60)
+                    prompt, max_tokens = personas.praise_prompt(args.persona, minutes), personas.PRAISE_MAX_TOKENS
+                t = time.perf_counter()
+                try:
+                    raw = gemma.generate_text(prompt, max_tokens=max_tokens, temperature=personas.ROAST_TEMPERATURE)
+                except Exception as e:  # a failed roast is a missed line, not a dead session
+                    errors += 1
+                    log.emit("error", n=n, stage=action, error=repr(e)[:300])
+                    raw = ""
+                timing["roast_s"] = round(time.perf_counter() - t, 3)
+                line = personas.clean_line(raw, persona=args.persona)
+                was_guarded = bool(line) and personas.is_unsafe(raw)
+                roasts += action == "roast"
+                guarded += was_guarded
             if line:
                 print(f"   🗣  {line}", flush=True)
                 try:
@@ -238,22 +305,20 @@ def main() -> None:
                 except OSError as e:
                     print(f"output failed: {e!r}", file=sys.stderr, flush=True)
 
-            log.write(
-                json.dumps(
-                    {
-                        "t": time.time(),
-                        "front_app": app_name,
-                        "host": rules.host(url),  # not the URL: paths and queries make the log a browsing diary
-                        "app": v["app"],
-                        "content": v["content"] if action == "roast" else None,  # only what was said out loud
-                        **{k: v[k] for k in ("category", "state", "rule", "latency_s")},
-                        "action": action,
-                        "line": line,
-                    }
-                )
-                + "\n"
+            timing["total_s"] = round(time.perf_counter() - tick, 3)
+            log.emit(
+                "check",
+                n=n,
+                front_app=app_name,
+                host=rules.host(url),  # not the URL: paths and queries make the log a browsing diary
+                app=v["app"],
+                content=v["content"] if action == "roast" else None,  # only what was said out loud
+                **{k: v[k] for k in ("category", "state", "rule", "latency_s")},
+                action=action,
+                line=line,
+                guarded=was_guarded,
+                timing=timing,
             )
-            log.flush()
             if args.once:
                 break
             time.sleep(max(0.0, args.interval - (time.perf_counter() - tick)) if not args.image else 0)
@@ -263,9 +328,19 @@ def main() -> None:
         Path(shot).unlink(missing_ok=True)
         if voice.proc:
             voice.proc.wait()
-        log.close()
         checks = coach.working_checks + coach.distracted_checks
         focus_pct = 100 * coach.working_checks / checks if checks else 0
+        log.emit(
+            "session_end",
+            checks=checks,
+            errors=errors,
+            roasts=roasts,
+            guarded=guarded,
+            focus_pct=round(focus_pct, 1),
+            duration_s=round(time.time() - started, 1),
+            peak_rss_mb=peak_rss_mb(),
+        )
+        log.close()
         print(
             f"\nsession {(time.time() - started) / 60:.1f} min · {checks} checks · "
             f"focused {focus_pct:.0f}% · call-outs {coach.strikes}"

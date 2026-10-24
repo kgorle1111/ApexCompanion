@@ -227,6 +227,30 @@ Pages a reasonable person could call either way are labeled ambiguous and report
 
 **Checking that the eval can fail.** We broke the category map on purpose and re-ran it (mutation testing). Moving `entertainment_video` into the working list turned the eval red on the distracted-recall gate (threshold 0.85). Moving `coding` into the distracted list turned it red with 6 false roasts. The first version of the gate checked accuracy only, and it did not catch the first mutation, so we added the recall gate.
 
+## Logs and observability
+
+Everything stays on your Mac. Each session writes one owner-only JSON Lines file (`logs/` when run from source, `~/Library/Application Support/ApexCompanion/logs/` for the app). Files older than 7 days are deleted at startup (`--log-days`).
+
+Every line carries a session id, a schema version and an event:
+
+| Event | What it records |
+|---|---|
+| `session_start` | persona, interval, cooldown, replay or screen mode, Python and macOS versions |
+| `model_ready` | model id, load time, memory |
+| `check` | verdict, category, rule hit, site host (never the full address), per-stage timing (`rules`, `capture`, `classify`, `roast`, `total`), whether the word filter replaced the line; screen text only when a roast fired |
+| `error` | which stage failed (`rules`, `capture`, `classify`, `roast`) and the error; the session keeps going |
+| `session_end` | checks, roasts, errors, focus %, duration, peak memory |
+
+To read it:
+
+```bash
+.venv/bin/python report.py            # latest session
+.venv/bin/python report.py --all      # every session
+.venv/bin/python report.py --json     # for scripts
+```
+
+The report shows focus %, roasts, how often a site rule decided the check, how often the word filter fired, error and unparsed-output rates, and p50/p95 for each stage. The app shows the same summary when you stop it. This is also where real end-to-end latency comes from: the 0.87 s figure above is the classify step alone, and `total` in a live session includes the screenshot.
+
 ## Limitations
 
 - **Web pages only.** The eval is 51 real web pages captured in a headless browser. No native-app frames (VS Code, the terminal, the native Spotify app, games) and no real desktop frames were tested. Your site list can cover a native app by name.

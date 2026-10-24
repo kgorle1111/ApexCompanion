@@ -1,6 +1,7 @@
 """The live loop in apex.main, driven end to end with the model, screen, browser and speech stubbed out."""
 
 import json
+import os
 import subprocess
 import sys
 import types
@@ -33,6 +34,7 @@ def run_main(monkeypatch, tmp_path, *, checks, shots=(), verdict=WORKING, front_
         return dict(verdict)
 
     fake_gemma = types.ModuleType("gemma")
+    fake_gemma.MODEL_ID = "fake-model"
     fake_gemma.load_model = lambda: None
     fake_gemma.classify = classify
     fake_gemma.generate_text = lambda prompt, **kw: seen["roast_prompt"].append(prompt) or "Back to work."
@@ -59,7 +61,8 @@ def run_main(monkeypatch, tmp_path, *, checks, shots=(), verdict=WORKING, front_
     monkeypatch.setattr(sys, "argv", argv)
     apex.main()
     (log_path,) = (tmp_path / "logs").glob("session-*.jsonl")
-    seen["log"] = [json.loads(line) for line in log_path.read_text().splitlines()]
+    seen["events"] = [json.loads(line) for line in log_path.read_text().splitlines()]
+    seen["log"] = [e for e in seen["events"] if e["event"] in ("check", "error")]
     seen["log_path"] = log_path
     return seen
 
@@ -148,3 +151,32 @@ def test_screen_description_stays_out_of_redirected_stdout(monkeypatch, tmp_path
     seen_text = {**WORKING, "content": "private chat with Sam about rent"}
     run_main(monkeypatch, tmp_path, checks=1, verdict=seen_text)
     assert "private chat" not in capsys.readouterr().out
+
+
+def test_every_event_carries_session_and_schema(monkeypatch, tmp_path):
+    seen = run_main(monkeypatch, tmp_path, checks=2)
+    kinds = [e["event"] for e in seen["events"]]
+    assert kinds[:2] == ["session_start", "model_ready"] and kinds[-1] == "session_end"
+    assert len({e["session"] for e in seen["events"]}) == 1 and all(e["schema"] == apex.SCHEMA for e in seen["events"])
+
+
+def test_check_records_stage_timings(monkeypatch, tmp_path):
+    seen = run_main(monkeypatch, tmp_path, checks=1)
+    timing = seen["log"][0]["timing"]
+    assert {"rules_s", "capture_s", "classify_s", "total_s"} <= timing.keys()
+    assert timing["total_s"] >= timing["capture_s"] + timing["rules_s"] - 1e-3
+
+
+def test_failed_check_names_its_stage(monkeypatch, tmp_path):
+    seen = run_main(monkeypatch, tmp_path, checks=2, shots=[False, True])
+    err = seen["log"][0]
+    assert (err["event"], err["stage"]) == ("error", "capture")
+    assert seen["events"][-1]["errors"] == 1
+
+
+def test_old_logs_are_pruned(tmp_path):
+    old, new = tmp_path / "session-old.jsonl", tmp_path / "session-new.jsonl"
+    old.write_text(""), new.write_text("")
+    os.utime(old, (0, 0))
+    assert apex.prune_logs(tmp_path, keep_days=7) == 1
+    assert not old.exists() and new.exists()
