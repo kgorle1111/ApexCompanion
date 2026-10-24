@@ -1,0 +1,24 @@
+[project]
+name = "apexcompanion"
+version = "0.1.0"
+description = "On-device focus coach: Gemma 4 watches your screen and a persona calls you out loud."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+dependencies = ["mlx-vlm==0.7.10", "pillow"]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff==0.14.0"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["docs", "evals"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]  # long prompt strings read better unwrapped; the formatter owns code width
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

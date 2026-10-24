@@ -1,0 +1,26 @@
+# planning / internal docs — never published
+PLAN.md
+docs/*
+!docs/demo.gif
+CLAUDE.md
+.claude/
+
+# real screenshots of the user's screen — private by design
+evals/**/*.jpg
+evals/**/*.png
+
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+logs/
+evals/review.html
+
+# user desktop screenshots (private) + full-res capture originals
+evals/user/
+evals/raw/
+sites.txt
+.impeccable/
+
+# built app + zip (packaging/build_app.sh)
+dist/
