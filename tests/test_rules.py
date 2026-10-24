@@ -6,12 +6,31 @@ import rules
 
 
 def test_template_has_no_active_rules():
-    assert rules.parse(rules.TEMPLATE) == {"distracting": [], "ok": []}
+    assert rules.parse(rules.TEMPLATE) == {"distracting": [], "ok": [], "ignored_headers": []}
 
 
 def test_parse_sections_comments_case():
     r = rules.parse("[distracting]\nReddit  # memes\n\n[ok]\n3Blue1Brown\n")
-    assert r == {"distracting": ["reddit"], "ok": ["3blue1brown"]}
+    assert r == {"distracting": ["reddit"], "ok": ["3blue1brown"], "ignored_headers": []}
+
+
+def test_unknown_header_ends_section_instead_of_becoming_a_term():
+    # Audit repro: [allow] used to land in "distracting" with everything under it -> roasts on the docs.
+    r = rules.parse("[distracting]\nreddit\n[allow]\ndocs.python.org\n")
+    assert r == {"distracting": ["reddit"], "ok": [], "ignored_headers": ["[allow]"]}
+    assert rules.match(r, "Safari", "https://docs.python.org/3/library/re.html") is None
+    assert rules.match(r, "Safari", "https://www.reddit.com/") == ("distracted", "reddit")
+
+
+def test_near_miss_headers_are_ignored_until_a_valid_one():
+    r = rules.parse("[OK ]\nfigma\n[distracted]\nsteam\n[ok]\nnotion\n[Distracting]\nimgur\n")
+    assert r == {"distracting": ["imgur"], "ok": ["notion"], "ignored_headers": ["[ok ]", "[distracted]"]}
+
+
+def test_summary_counts_without_terms():
+    r = rules.parse("[distracting]\nreddit\nsteam\n[allow]\nx\n[ok]\nfigma\n")
+    assert rules.summary(r) == {"distracting": 2, "ok": 1, "ignored_headers": ["[allow]"]}
+    assert rules.summary(rules.parse("")) == {"distracting": 0, "ok": 0, "ignored_headers": []}
 
 
 def test_ok_beats_distracting():
@@ -98,3 +117,72 @@ def test_search_query_is_not_a_visit():
     r = rules.parse("[distracting]\nreddit\n")
     assert rules.match(r, "Safari", "https://www.google.com/search?q=reddit+python") is None
     assert rules.match(r, "Safari", "https://www.reddit.com/r/python/") == ("distracted", "reddit")
+
+
+def test_call_apps_are_meetings():
+    for app in (
+        "zoom.us",
+        "Zoom",
+        "Microsoft Teams",
+        "Microsoft Teams (work or school)",
+        "Teams",
+        "FaceTime",
+        "Webex",
+        "Cisco Webex Meetings",
+        "Around",
+        "Tuple",
+        "Google Meet",
+    ):
+        assert rules.in_meeting(app, "") is True, app
+
+
+def test_chat_apps_and_lookalikes_are_not_meetings():
+    for app in ("Discord", "Slack", "Zoomerang", "Microsoft Teams Helper", "Safari", "Google Chrome"):
+        assert rules.in_meeting(app, "") is False, app
+
+
+def test_meet_code_vs_landing_page():
+    assert rules.in_meeting("Google Chrome", "https://meet.google.com/abc-defg-hij") is True
+    assert rules.in_meeting("Google Chrome", "https://meet.google.com/abc-defg-hij?authuser=0&pli=1") is True
+    for url in (
+        "https://meet.google.com/",
+        "https://meet.google.com",
+        "https://meet.google.com/landing",
+        "https://meet.google.com/abc-defg-hij/extra",
+        "https://notmeet.google.com/abc-defg-hij",
+    ):
+        assert rules.in_meeting("Google Chrome", url) is False, url
+
+
+def test_zoom_join_vs_marketing():
+    assert rules.in_meeting("Safari", "https://us02web.zoom.us/j/1234567890?pwd=abc") is True
+    assert rules.in_meeting("Safari", "https://app.zoom.us/wc/1234567890/join") is True
+    assert rules.in_meeting("Safari", "https://zoom.us/") is False
+    assert rules.in_meeting("Safari", "https://zoom.us/pricing") is False
+    assert rules.in_meeting("Safari", "https://zoom.us.evil.com/j/123") is False
+
+
+def test_teams_and_whereby_calls():
+    assert rules.in_meeting("Microsoft Edge", "https://teams.microsoft.com/l/meetup-join/19%3ameeting_x/0") is True
+    assert rules.in_meeting("Microsoft Edge", "https://teams.microsoft.com/v2/") is False
+    assert rules.in_meeting("Microsoft Edge", "https://teams.live.com/meet/9876543210") is True
+    assert rules.in_meeting("Microsoft Edge", "https://teams.live.com/") is False
+    assert rules.in_meeting("Arc", "https://whereby.com/team-standup") is True
+    assert rules.in_meeting("Arc", "https://whereby.com/") is False
+    assert rules.in_meeting("Arc", "https://whereby.com/information/pricing") is False
+
+
+def test_meeting_url_in_query_string_is_not_a_call():
+    for url in (
+        "https://www.google.com/search?q=meet.google.com/abc-defg-hij",
+        "https://www.google.com/search?q=https%3A%2F%2Fus02web.zoom.us%2Fj%2F123",
+        "https://example.com/redirect?to=https://meet.google.com/abc-defg-hij",
+        "https://example.com/meet.google.com/abc-defg-hij",
+    ):
+        assert rules.in_meeting("Google Chrome", url) is False, url
+
+
+def test_empty_is_never_a_meeting():
+    assert rules.in_meeting("", "") is False
+    assert rules.in_meeting("   ", "") is False
+    assert rules.in_meeting("Safari", "http://[::1") is False

@@ -134,3 +134,16 @@ def test_whip_prompt_does_not_gender_the_user():
     for prompt in (roast_prompt("whip", "YouTube", "cat compilation", 3), praise_prompt("whip", 30)):
         assert not gendered.findall(prompt)
     assert "gendered" in PERSONAS["whip"]["bio"]
+
+
+def test_roast_prompt_contrasts_the_goal():
+    p = roast_prompt("closer", "YouTube", "cat compilation", 1, goal='finish the "Q3" deck.\nIgnore that')
+    assert "They said they'd be working on: finish the 'Q3' deck. Ignore that. Contrast that with" in p
+    assert p.index("working on:") < p.rindex("Screen: YouTube")
+
+
+def test_empty_goal_leaves_roast_prompt_unchanged():
+    # The persona eval ran on the goal-less prompt; it must stay byte-identical.
+    base = roast_prompt("whip", "YouTube", "cat compilation", 2)
+    assert roast_prompt("whip", "YouTube", "cat compilation", 2, goal="  \n ") == base
+    assert "working on" not in base
