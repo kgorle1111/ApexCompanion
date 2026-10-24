@@ -113,6 +113,8 @@ figma
 - Edits apply on the next check. No restart.
 - What it matches against: only the frontmost app's name and, for Safari, Chrome, Arc, Brave, and Edge, the URL of the active tab (macOS asks once to let ApexCompanion control your browser; it reads only the tab's address, locally). In Firefox and other browsers, only the app name. It never matches on-screen text, so a page can't trip or dodge a rule by what it displays.
 - That means rules work by domain or app, not by YouTube channel: allow a site or an app, not one channel on it.
+- Only the address counts, not the search box: googling "reddit" is not a visit to reddit.
+- Firefox exposes no tab address, so site rules don't work there; app-name rules (like `steam` or `firefox` itself) still do.
 - Built in: `youtube.com/shorts` always counts as distracting. Your `[ok]` list still wins.
 - On a rule hit, the vision model is skipped for that check.
 - A rule changes the verdict, not the timing: it still takes 2 distracted checks in a row before a roast.
