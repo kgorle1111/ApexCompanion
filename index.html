@@ -323,7 +323,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
     <div class="vs">
       <div class="panel blocker">
         <h3><span class="tag mute">Blocklist</span> What a blocker sees</h3>
-        <p class="sub">A URL or a window title. Pattern-match it and hope.</p>
+        <p class="sub">It only sees a URL or a window title, so it matches patterns.</p>
         <div class="rows">
           <div class="row"><div class="url">youtube.com/watch?v=&hellip;</div><div class="verdict"><span class="tag bad">Blocked</span> matches "youtube.com"</div></div>
           <div class="row"><div class="url">youtube.com/watch?v=&hellip;</div><div class="verdict"><span class="tag bad">Blocked</span> matches "youtube.com"</div></div>
@@ -348,7 +348,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
 <section id="how">
   <div class="wrap">
     <div class="kicker">How it works</div>
-    <h2>One model call. Plain code decides.</h2>
+    <h2>How one check works</h2>
     <p class="lede">Gemma 4 describes what's on screen and picks a category. Ordinary Python maps that category to a verdict. The model never gets the final say on whether you're slacking.</p>
 
     <div class="pipe" role="img" aria-label="Pipeline: 1 screenshot every 10 seconds, 2 Gemma 4 vision returns app, content, category as JSON, 3 code maps category to working or distracted, 4 debounce two checks in a row plus 60 second cooldown, 5 Gemma 4 text writes a persona roast, 6 macOS notification and spoken voice.">
@@ -495,7 +495,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
 <section id="personas">
   <div class="wrap">
     <div class="kicker">Pick your coach</div>
-    <h2>Two coaches. Zero small talk.</h2>
+    <h2>Pick your coach</h2>
     <p class="lede">Each roast is generated fresh by Gemma 4 and refers to what's actually on your screen and the goal you set. The app remembers your coach; switch any time.</p>
 
     <div class="personas">
