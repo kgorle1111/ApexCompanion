@@ -3,10 +3,12 @@
 import re
 import subprocess
 from pathlib import Path
+from urllib.parse import urlsplit
 
 TEMPLATE = """\
 # ApexCompanion: your sites and apps.
-# One per line: a site name, domain, app name or channel. Not case-sensitive. Lines starting with # are ignored.
+# One per line: a site name, domain or app name. Not case-sensitive. Lines starting with # are ignored.
+# Matched against the frontmost app's name and the browser tab's address, never against what is on screen.
 # Changes apply on the next check; no restart needed.
 
 [distracting]
@@ -17,7 +19,7 @@ TEMPLATE = """\
 
 [ok]
 # Never call me out for these (wins over the list above):
-# 3blue1brown
+# docs.python.org
 # figma
 """
 
@@ -73,16 +75,40 @@ def _hit(term: str, haystack: str) -> bool:
     return re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", haystack) is not None
 
 
-def match(rules: dict[str, list[str]], *texts: str) -> tuple[str, str] | None:
-    """Return ("working"|"distracted", term) if a user rule applies. "ok" wins over "distracting"."""
-    haystack = " | ".join(t.lower() for t in texts if t)
+def host(url: str) -> str:
+    try:
+        return urlsplit(url).hostname or ""
+    except ValueError:  # malformed netloc, e.g. an unclosed IPv6 bracket
+        return ""
+
+
+def match(rules: dict[str, list[str]], front_app: str, url: str) -> tuple[str, str] | None:
+    """Return ("working"|"distracted", term) if a user rule applies. "ok" wins over "distracting".
+    Trusted signals only: never the model's reading of the screen, which any page, sidebar or terminal
+    output can steer (a "3blue1brown" sidebar link, a log line printing "netflix")."""
+    haystack = " | ".join(t.lower() for t in (front_app, url, host(url)) if t)
     for term in rules["ok"]:
         if _hit(term, haystack):
             return "working", term
     for term in rules["distracting"]:
         if _hit(term, haystack):
             return "distracted", term
+    if _is_shorts(url):
+        return "distracted", SHORTS
     return None
+
+
+SHORTS = "youtube.com/shorts"
+
+
+def _is_shorts(url: str) -> bool:
+    # Built in because the model can't be trusted here: the one clear-cut blind-eval miss was a Short it
+    # called educational_video. Host + path, so "youtube.com/shorts" inside a query string doesn't count.
+    h = host(url)
+    if h != "youtube.com" and not h.endswith(".youtube.com"):
+        return False
+    path = urlsplit(url).path.lower()
+    return path == "/shorts" or path.startswith("/shorts/")
 
 
 class Rules:

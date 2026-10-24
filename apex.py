@@ -84,7 +84,9 @@ def warm_up(gemma) -> None:
 def capture(path: str) -> str:
     r = subprocess.run(["screencapture", "-x", "-t", "jpg", path], capture_output=True)
     if r.returncode != 0 or not Path(path).exists() or Path(path).stat().st_size == 0:
-        sys.exit(
+        # Not sys.exit: SystemExit escapes the loop's `except Exception`, and a locked screen or sleeping
+        # display fails capture transiently; that must skip one check, not end the session.
+        raise RuntimeError(
             "screencapture failed. Grant Screen Recording to this terminal app "
             "(System Settings → Privacy & Security → Screen Recording), then restart it."
         )
@@ -164,7 +166,9 @@ def main() -> None:
     print(f"model ready in {time.perf_counter() - t0:.1f}s", flush=True)
 
     LOG_DIR.mkdir(exist_ok=True)
-    log = (LOG_DIR / f"session-{time.strftime('%Y%m%d-%H%M%S')}.jsonl").open("a")
+    log_path = LOG_DIR / f"session-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    # Owner-only from creation: even trimmed, the log says which apps and sites were in front and when.
+    log = os.fdopen(os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), "a")
     coach = Coach(args.streak, args.cooldown, args.praise_every)
     fd, shot = tempfile.mkstemp(prefix="apex_", suffix=".jpg")  # per-run: two instances can't clobber
     os.close(fd)
@@ -179,8 +183,13 @@ def main() -> None:
             try:
                 app_name = "" if args.image else rules.front_app()
                 url = rules.front_url(app_name) if app_name else ""
-                path = images.pop(0) if images else capture(shot)
-                v = gemma.classify(path)
+                hit = rules.match(user_rules.current(), app_name, url)
+                if hit:  # the user's list beats the model both ways, so no frame is taken or read at all
+                    v = {"app": app_name, "content": rules.host(url), "category": "rule", "latency_s": 0.0}
+                    v["state"], v["rule"] = hit
+                else:
+                    path = images.pop(0) if images else capture(shot)
+                    v = gemma.classify(path) | {"rule": None}
             except Exception as e:  # one bad frame must not end a live session
                 print(f"{time.strftime('%H:%M:%S')} check failed: {e!r}", file=sys.stderr, flush=True)
                 log.write(json.dumps({"t": time.time(), "error": repr(e)[:300]}) + "\n")
@@ -190,10 +199,6 @@ def main() -> None:
                 continue
             finally:
                 Path(shot).unlink(missing_ok=True)  # privacy claim: no frame outlives its check
-            hit = rules.match(user_rules.current(), app_name, url, v["app"], v["content"])
-            v["rule"] = None
-            if hit:  # the user's list beats the model, both ways
-                v["state"], v["rule"] = hit
             action = coach.observe(v["state"], time.monotonic())
             mark = "🟢" if v["state"] == "working" else "🔴"
             why = f"rule:{v['rule']}" if v["rule"] else v["category"]
@@ -234,8 +239,10 @@ def main() -> None:
                     {
                         "t": time.time(),
                         "front_app": app_name,
-                        "url": url,
-                        **{k: v[k] for k in ("app", "content", "category", "state", "rule", "latency_s")},
+                        "host": rules.host(url),  # not the URL: paths and queries make the log a browsing diary
+                        "app": v["app"],
+                        "content": v["content"] if action == "roast" else None,  # only what was said out loud
+                        **{k: v[k] for k in ("category", "state", "rule", "latency_s")},
                         "action": action,
                         "line": line,
                     }
