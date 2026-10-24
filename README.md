@@ -4,7 +4,7 @@
 
 ![ApexCompanion demo](docs/demo.gif)
 
-Demo video: coming soon.
+Demo video and landing page: https://kgorle1111.github.io/ApexCompanion/
 
 ## Download
 
