@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import resource
+import signal
 import subprocess
 import sys
 import tempfile
@@ -62,7 +63,7 @@ class Coach:
 
     streak_to_roast: int = 2
     cooldown_s: float = 60.0
-    praise_every: int = 30
+    praise_every: int = 0
     distracted_run: int = 0
     working_run: int = 0
     last_roast_at: float = field(default=float("-inf"))
@@ -168,13 +169,23 @@ class Voice:
         self.proc = subprocess.Popen(["say", "-v", self.voice, "-r", str(self.rate), "--", text])
 
 
+def _graceful_term(signum, frame) -> None:
+    # The launcher's fallback is SIGTERM; take the Ctrl-C path so session_end, state.json and frame cleanup still run.
+    raise KeyboardInterrupt
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--persona", default="closer")
     ap.add_argument("--interval", type=float, default=10.0, help="seconds between checks")
     ap.add_argument("--cooldown", type=float, default=60.0, help="min seconds between roasts")
     ap.add_argument("--streak", type=int, default=2, help="consecutive distracted checks before a roast")
-    ap.add_argument("--praise-every", type=int, default=30, help="praise after N working checks in a row (0=off)")
+    ap.add_argument(
+        "--praise-every", type=int, default=0, help="log praise after N working checks in a row (0=off); never spoken"
+    )
+    ap.add_argument("--goal", default="", help="what you plan to work on; call-outs contrast it with the screen")
+    ap.add_argument("--minutes", type=float, default=0.0, help="end the session after N minutes (0 = no limit)")
+    ap.add_argument("--state-dir", help="write state.json and obey control.json here (the menu bar app)")
     ap.add_argument("--image", action="append", help="classify these files instead of the screen (repeatable)")
     ap.add_argument("--once", action="store_true", help="one check, print verdict, exit")
     ap.add_argument("--mute", action="store_true")
@@ -185,8 +196,10 @@ def main() -> None:
     )
     ap.add_argument("--log-days", type=float, default=7.0, help="delete session logs older than this (0 = keep all)")
     args = ap.parse_args()
+    session_t0 = time.time()
 
-    import personas  # noqa: E402  (after argparse so --help is instant)
+    import control  # noqa: E402  (after argparse so --help is instant)
+    import personas  # noqa: E402
     import rules  # noqa: E402
 
     user_rules = rules.Rules(Path(args.sites))
@@ -196,6 +209,7 @@ def main() -> None:
     p = personas.PERSONAS[args.persona]
     title = f"ApexCompanion · {args.persona.title()}"
     voice = Voice(p["voice"], p["rate"], args.mute)
+    goal = control.clean_goal(args.goal)
 
     if not args.image:
         require_screen_permission()
@@ -203,6 +217,52 @@ def main() -> None:
     LOG_DIR.mkdir(exist_ok=True)
     pruned = prune_logs(LOG_DIR, args.log_days) if args.log_days > 0 else 0
     session = uuid.uuid4().hex[:8]
+    ctl = None
+    if args.state_dir:
+        Path(args.state_dir).mkdir(mode=0o700, parents=True, exist_ok=True)
+        ctl = control.Control(Path(args.state_dir) / "control.json", since=session_t0)
+    started = last_mark = focused_s = 0.0
+    ends_at: float | None = None
+    last_state, last_line, stop_reason = "starting", None, None
+    errors = roasts = praises = guarded = 0
+
+    def publish(state: str) -> None:
+        nonlocal last_state
+        last_state = state
+        if not ctl:
+            return
+        now = time.time()
+        paused_until = ctl.values["paused_until"]
+        try:
+            control.write_state(
+                Path(args.state_dir) / "state.json",
+                {
+                    "schema": control.SCHEMA,
+                    "t": now,
+                    "session": session,
+                    "persona": args.persona,
+                    "goal": goal,
+                    "state": state,
+                    "focused_s": int(focused_s),
+                    "elapsed_s": int(now - started) if started else 0,
+                    "ends_at": ends_at,
+                    "paused_until": paused_until if paused_until and paused_until > now else None,
+                    "muted": voice.mute,
+                    "roasts": roasts,
+                    "last_line": last_line,
+                    "stop_reason": stop_reason,
+                },
+            )
+        except OSError as e:  # the menu bar goes stale, but the session itself is fine
+            print(f"state write failed: {e!r}", file=sys.stderr, flush=True)
+
+    def end_reason() -> str | None:
+        if ctl and ctl.current()["stop"]:
+            return "user"
+        if ends_at is not None and time.time() >= ends_at:
+            return "timer"
+        return None
+
     log = EventLog(LOG_DIR / f"session-{time.strftime('%Y%m%d-%H%M%S')}-{session}.jsonl", session)
     log.emit(
         "session_start",
@@ -210,34 +270,56 @@ def main() -> None:
         interval_s=args.interval,
         cooldown_s=args.cooldown,
         streak=args.streak,
+        minutes=args.minutes,
+        goal_set=bool(goal),
         mode="replay" if args.image else "screen",
         python=platform.python_version(),
         macos=platform.mac_ver()[0],
         pruned_logs=pruned,
     )
-
-    print("loading Gemma 4 (local, offline)…", flush=True)
-    t0 = time.perf_counter()
-    import gemma  # noqa: E402
-
-    gemma.load_model()
-    warm_up(gemma)
-    load_s = time.perf_counter() - t0
-    print(f"model ready in {load_s:.1f}s", flush=True)
-    log.emit("model_ready", model=gemma.MODEL_ID, load_s=round(load_s, 2), rss_mb=peak_rss_mb())
+    publish("starting")
     coach = Coach(args.streak, args.cooldown, args.praise_every)
     fd, shot = tempfile.mkstemp(prefix="apex_", suffix=".jpg")  # per-run: two instances can't clobber
     os.close(fd)
     images = list(args.image or [])
-    started = time.time()
     n = 0
-    errors = roasts = guarded = 0
+    prev_term = signal.signal(signal.SIGTERM, _graceful_term)
 
     try:
+        print("loading Gemma 4 (local, offline)…", flush=True)
+        t0 = time.perf_counter()
+        import gemma  # noqa: E402
+
+        gemma.load_model()
+        warm_up(gemma)
+        load_s = time.perf_counter() - t0
+        print(f"model ready in {load_s:.1f}s", flush=True)
+        log.emit("model_ready", model=gemma.MODEL_ID, load_s=round(load_s, 2), rss_mb=peak_rss_mb())
+        started = last_mark = time.time()
+        # Fixed at start: pausing doesn't extend it, the menu bar derives "of N min" from ends_at.
+        ends_at = started + args.minutes * 60 if args.minutes > 0 else None
         while True:
             tick = time.perf_counter()
             if args.image and not images:
                 break
+            stop_reason = end_reason()
+            if stop_reason == "timer":
+                last_line = f"Session done: {round(focused_s / 60)} min focused."
+                print(f"   🗣  {last_line}", flush=True)
+                try:
+                    notify(last_line, title)
+                    voice.say(last_line)
+                except OSError as e:
+                    print(f"output failed: {e!r}", file=sys.stderr, flush=True)
+            if stop_reason:
+                break
+            if ctl:
+                voice.mute = args.mute or ctl.values["muted"]
+                if ctl.paused(time.time()):  # no frame, no model call until paused_until passes
+                    last_mark = time.time()
+                    publish("paused")
+                    time.sleep(args.interval)
+                    continue
             n += 1
             timing: dict[str, float] = {}
             stage = "rules"
@@ -245,9 +327,13 @@ def main() -> None:
                 t = time.perf_counter()
                 app_name = "" if args.image else rules.front_app()
                 url = rules.front_url(app_name) if app_name else ""
-                hit = rules.match(user_rules.current(), app_name, url)
+                meeting = rules.in_meeting(app_name, url)
+                hit = None if meeting else rules.match(user_rules.current(), app_name, url)
                 timing["rules_s"] = round(time.perf_counter() - t, 4)
-                if hit:  # the user's list beats the model both ways, so no frame is taken or read at all
+                if meeting:  # counted as working so a call doesn't cost focus %; nothing is captured or said
+                    v = {"app": app_name, "content": rules.host(url), "category": "meeting", "latency_s": 0.0}
+                    v["state"], v["rule"] = "working", None
+                elif hit:  # the user's list beats the model both ways, so no frame is taken or read at all
                     v = {"app": app_name, "content": rules.host(url), "category": "rule", "latency_s": 0.0}
                     v["state"], v["rule"] = hit
                 else:
@@ -261,13 +347,23 @@ def main() -> None:
                 errors += 1
                 print(f"{time.strftime('%H:%M:%S')} check failed: {e!r}", file=sys.stderr, flush=True)
                 log.emit("error", n=n, stage=stage, error=repr(e)[:300])
+                last_mark = time.time()
+                publish(last_state)
                 if args.once:
                     break
-                time.sleep(args.interval if not args.image else 0)
+                if end_reason() is None:
+                    time.sleep(args.interval if not args.image else 0)
                 continue
             finally:
                 Path(shot).unlink(missing_ok=True)  # privacy claim: no frame outlives its check
             action = coach.observe(v["state"], time.monotonic())
+            if v["category"] == "meeting":
+                action = None
+            now = time.time()
+            if v["state"] == "working":
+                # Capped so a Mac that slept between checks doesn't credit hours of focus.
+                focused_s += min(now - last_mark, args.interval + 120)
+            last_mark = now
             mark = "🟢" if v["state"] == "working" else "🔴"
             why = f"rule:{v['rule']}" if v["rule"] else v["category"]
             print(
@@ -280,7 +376,7 @@ def main() -> None:
             was_guarded = False
             if action in ("roast", "praise"):
                 if action == "roast":
-                    prompt = personas.roast_prompt(args.persona, v["app"], v["content"], coach.strikes)
+                    prompt = personas.roast_prompt(args.persona, v["app"], v["content"], coach.strikes, goal=goal)
                     max_tokens = personas.ROAST_MAX_TOKENS
                 else:
                     minutes = round(coach.working_run * args.interval / 60)
@@ -296,8 +392,12 @@ def main() -> None:
                 line = personas.clean_line(raw, persona=args.persona)
                 was_guarded = bool(line) and personas.is_unsafe(raw)
                 roasts += action == "roast"
+                praises += action == "praise"
                 guarded += was_guarded
-            if line:
+            if line and action == "praise":  # logged only: a spoken compliment breaks the focus it praises
+                print(f"   ✓  {line}", flush=True)
+            elif line:
+                last_line = line
                 print(f"   🗣  {line}", flush=True)
                 try:
                     notify(line, title)
@@ -319,12 +419,15 @@ def main() -> None:
                 guarded=was_guarded,
                 timing=timing,
             )
+            publish("meeting" if v["category"] == "meeting" else v["state"])
             if args.once:
                 break
-            time.sleep(max(0.0, args.interval - (time.perf_counter() - tick)) if not args.image else 0)
+            if end_reason() is None:
+                time.sleep(max(0.0, args.interval - (time.perf_counter() - tick)) if not args.image else 0)
     except KeyboardInterrupt:
         pass
     finally:
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)  # a second TERM must not cut session_end short
         Path(shot).unlink(missing_ok=True)
         if voice.proc:
             voice.proc.wait()
@@ -335,14 +438,18 @@ def main() -> None:
             checks=checks,
             errors=errors,
             roasts=roasts,
+            praises=praises,
             guarded=guarded,
             focus_pct=round(focus_pct, 1),
-            duration_s=round(time.time() - started, 1),
+            duration_s=round(time.time() - started, 1) if started else 0.0,
             peak_rss_mb=peak_rss_mb(),
+            stop_reason=stop_reason,
         )
         log.close()
+        publish("stopped")
+        signal.signal(signal.SIGTERM, prev_term)
         print(
-            f"\nsession {(time.time() - started) / 60:.1f} min · {checks} checks · "
+            f"\nsession {(time.time() - started) / 60 if started else 0:.1f} min · {checks} checks · "
             f"focused {focus_pct:.0f}% · call-outs {coach.strikes}"
         )
 
