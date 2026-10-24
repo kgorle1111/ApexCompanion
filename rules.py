@@ -56,18 +56,33 @@ def front_url(app: str) -> str:
     return r.stdout.strip()[:500] if r.returncode == 0 else ""
 
 
+SECTIONS = ("distracting", "ok")
+
+
 def parse(text: str) -> dict[str, list[str]]:
-    rules: dict[str, list[str]] = {"distracting": [], "ok": []}
+    """Terms per section, plus "ignored_headers": any other [header] line. An unknown header ends the
+    current section instead of becoming a term, so a typo like [allow] can't turn the sites under it into
+    distracting ones; its lines are skipped until the next valid header."""
+    rules: dict[str, list[str]] = {name: [] for name in SECTIONS} | {"ignored_headers": []}
     section = None
     for raw in text.splitlines():
         line = raw.split("#", 1)[0].strip().lower()
         if not line:
             continue
-        if line in ("[distracting]", "[ok]"):
-            section = line[1:-1]
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1] if line[1:-1] in SECTIONS else None
+            if section is None:
+                rules["ignored_headers"].append(line[:100])
         elif section:
             rules[section].append(line[:100])
     return rules
+
+
+def summary(rules: dict[str, list[str]]) -> dict:
+    """Counts plus unrecognized header lines, never the site terms themselves: safe to log."""
+    return {name: len(rules.get(name, [])) for name in SECTIONS} | {
+        "ignored_headers": list(rules.get("ignored_headers", []))
+    }
 
 
 def _hit(term: str, haystack: str) -> bool:

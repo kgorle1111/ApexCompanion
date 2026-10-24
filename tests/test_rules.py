@@ -6,12 +6,31 @@ import rules
 
 
 def test_template_has_no_active_rules():
-    assert rules.parse(rules.TEMPLATE) == {"distracting": [], "ok": []}
+    assert rules.parse(rules.TEMPLATE) == {"distracting": [], "ok": [], "ignored_headers": []}
 
 
 def test_parse_sections_comments_case():
     r = rules.parse("[distracting]\nReddit  # memes\n\n[ok]\n3Blue1Brown\n")
-    assert r == {"distracting": ["reddit"], "ok": ["3blue1brown"]}
+    assert r == {"distracting": ["reddit"], "ok": ["3blue1brown"], "ignored_headers": []}
+
+
+def test_unknown_header_ends_section_instead_of_becoming_a_term():
+    # Audit repro: [allow] used to land in "distracting" with everything under it -> roasts on the docs.
+    r = rules.parse("[distracting]\nreddit\n[allow]\ndocs.python.org\n")
+    assert r == {"distracting": ["reddit"], "ok": [], "ignored_headers": ["[allow]"]}
+    assert rules.match(r, "Safari", "https://docs.python.org/3/library/re.html") is None
+    assert rules.match(r, "Safari", "https://www.reddit.com/") == ("distracted", "reddit")
+
+
+def test_near_miss_headers_are_ignored_until_a_valid_one():
+    r = rules.parse("[OK ]\nfigma\n[distracted]\nsteam\n[ok]\nnotion\n[Distracting]\nimgur\n")
+    assert r == {"distracting": ["imgur"], "ok": ["notion"], "ignored_headers": ["[ok ]", "[distracted]"]}
+
+
+def test_summary_counts_without_terms():
+    r = rules.parse("[distracting]\nreddit\nsteam\n[allow]\nx\n[ok]\nfigma\n")
+    assert rules.summary(r) == {"distracting": 2, "ok": 1, "ignored_headers": ["[allow]"]}
+    assert rules.summary(rules.parse("")) == {"distracting": 0, "ok": 0, "ignored_headers": []}
 
 
 def test_ok_beats_distracting():
