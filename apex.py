@@ -12,6 +12,8 @@ from pathlib import Path
 
 SHOT_MAX_PX = 1024
 LOG_DIR = Path(__file__).parent / "logs"
+# The packaged app redirects stdout into a log file; the screen description only goes to a live terminal.
+INTERACTIVE = sys.stdout.isatty()
 
 
 @dataclass
@@ -204,7 +206,7 @@ def main() -> None:
             why = f"rule:{v['rule']}" if v["rule"] else v["category"]
             print(
                 f"{time.strftime('%H:%M:%S')} {mark} {why:<20} {v['app'][:20]:<20} "
-                f"{v['content'][:50]:<50} {v['latency_s']:.2f}s",
+                f"{v['content'][:50] if INTERACTIVE else '':<50} {v['latency_s']:.2f}s",
                 flush=True,
             )
 
@@ -215,7 +217,8 @@ def main() -> None:
                         personas.roast_prompt(args.persona, v["app"], v["content"], coach.strikes),
                         max_tokens=personas.ROAST_MAX_TOKENS,
                         temperature=personas.ROAST_TEMPERATURE,
-                    )
+                    ),
+                    persona=args.persona,
                 )
             elif action == "praise":
                 minutes = round(coach.working_run * args.interval / 60)
@@ -224,7 +227,8 @@ def main() -> None:
                         personas.praise_prompt(args.persona, minutes),
                         max_tokens=personas.PRAISE_MAX_TOKENS,
                         temperature=personas.ROAST_TEMPERATURE,
-                    )
+                    ),
+                    persona=args.persona,
                 )
             if line:
                 print(f"   🗣  {line}", flush=True)
