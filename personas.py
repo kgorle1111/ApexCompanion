@@ -1,6 +1,7 @@
 """Roast/praise personas for ApexCompanion. Original characters; prompts are few-shot, output is post-processed by clean_line."""
 
 import re
+import zlib
 
 PERSONAS: dict[str, dict] = {
     "closer": {
@@ -39,6 +40,12 @@ PERSONAS: dict[str, dict] = {
             "Forty minutes of real work. That is how deals close, now do not get sentimental about it.",
             "Sixty minutes billed and not one tab wasted. The partners noticed, which is the most dangerous thing that can happen to you.",
         ],
+        # Spoken instead of a model line that fails the output guard in clean_line.
+        "safe_lines": [
+            "I am not repeating what is on that screen. Close the tab and get back to the deal.",
+            "Whatever that is, it is not billable. Close it and get back to work.",
+            "The partners do not need to hear that one. Close the tab and close the deal.",
+        ],
     },
     "whip": {
         "name": "The Whip",
@@ -75,6 +82,10 @@ PERSONAS: dict[str, dict] = {
         "praise_examples": [
             "Thirty minutes, and not one wandering eye. I may have underestimated you, and I do not do that twice.",
             "Twenty minutes of plowing straight. Keep the mule pointed at the field and we will all eat this winter.",
+        ],
+        "safe_lines": [
+            "I will not be repeating what is on that screen, friend. Get back to the field.",
+            "Some things do not get said out loud, and that is one of them. Back to work.",
         ],
     },
 }
@@ -149,9 +160,61 @@ _STAGE = re.compile(r"\([^)]*\)|\[[^\]]*\]|\*[^*]+\*")
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
 MAX_CHARS = 220
 
+# Output safety filter: lines are spoken aloud on stage and the prompt embeds untrusted screen text, so a
+# model line containing any of these is replaced, never spoken. Kept small on purpose (slurs + strong
+# profanity). Plain entries match a whole word (optional plural "s"); a "*" end matches any letters there.
+# kn: word-list filter, not a classifier; misses novel spellings/separators ("f u c k"). Upgrade path is a
+# small local moderation model on the final line if the demo ever runs unattended.
+_BLOCKED = (
+    "nigger", "nigga", "fag*", "retard", "retarded", "spic", "chink", "kike", "tranny", "wetback",
+    "coon", "gook", "beaner", "raghead", "towelhead", "dyke",
+    "*fuck*", "*shit*", "cunt*", "bitch*", "asshole", "whore*", "slut*", "pussy", "twat",
+)  # fmt: skip
+_LEET = str.maketrans("013457@$", "oieastas")
 
-def clean_line(text: str) -> str:
-    """Model output -> one speakable line: no labels/markdown/emoji/stage directions, <=2 sentences, <=220 chars."""
+
+def _blocked_pattern(term: str) -> str:
+    # Each letter may repeat ("fuuuck") so stretched spellings still match; "*" means more letters may follow.
+    core = "".join(f"{re.escape(c)}+" for c in term.strip("*"))
+    head = r"[a-z]*" if term.startswith("*") else r"\b"
+    tail = r"[a-z]*" if term.endswith("*") else r"s?\b"
+    return head + core + tail
+
+
+_BLOCKED_RE = re.compile("|".join(_blocked_pattern(t) for t in _BLOCKED))
+# Signs that injected screen text steered the model: meta-instructions, dictation cues, links.
+_INJECTION_RE = re.compile(
+    r"\b(?:ignore|disregard) (?:all|previous|prior|earlier|the above|above)\b"
+    r"|\b(?:previous|prior|earlier) (?:instructions|prompts?|messages?)\b"
+    r"|\bsystem prompt\b|\brepeat after me\b|\bsay\s*:|\bjailbreak\b"
+    # Links only by scheme/www: bare "name.tld" also matches game and site names the roast should say (Slither.io).
+    r"|https?:|www\.",
+    re.I,
+)
+
+
+def is_unsafe(text: str) -> bool:
+    """True if a line must not be spoken: a blocked term (incl. leetspeak/stretched letters) or an injection marker."""
+    t = str(text or "")
+    return bool(_INJECTION_RE.search(t) or _BLOCKED_RE.search(t.lower().translate(_LEET)))
+
+
+def safe_line(persona: str, text: str = "") -> str:
+    # Deterministic pick (crc32, not the salted hash()) so the same bad line always maps to the same fallback.
+    lines = PERSONAS.get(persona, PERSONAS["closer"])["safe_lines"]
+    return lines[zlib.crc32(str(text).encode()) % len(lines)]
+
+
+def clean_line(text: str, persona: str = "closer") -> str:
+    """Model output -> one speakable line: no labels/markdown/emoji/stage directions, <=2 sentences, <=220 chars.
+
+    A line that trips the output guard (is_unsafe) is replaced by a fixed safe line for `persona`.
+    """
+    line = _clean(text)
+    return safe_line(persona, line) if line and is_unsafe(line) else line
+
+
+def _clean(text: str) -> str:
     if not text:
         return ""
     lines = [ln.strip() for ln in str(text).splitlines() if ln.strip()]
