@@ -23,7 +23,7 @@ Demo video and landing page: https://kgorle1111.github.io/ApexCompanion/
 1. Download **ApexCompanion.zip** from [Releases](https://github.com/kgorle1111/ApexCompanion/releases/latest).
 2. Unzip it and drag **ApexCompanion** into Applications.
 3. Open it. macOS warns you because the app is not notarized: click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway** (first time only; on macOS 15 and later, right-click → Open no longer gets you past this).
-4. Pick your coach. It remembers your pick; choose **Switch persona** to change it.
+4. Pick your coach. It remembers your pick; to change it, choose **Start with another persona…** from the menu bar when no session is running.
 5. Say what you're working on and pick a length: 25, 50 or 90 minutes, or no limit.
 6. Look at your menu bar: **◉ 0m** means it's watching. The number counts your focused minutes.
 
@@ -57,7 +57,10 @@ The menu:
 - **Edit my sites…**: opens your site list (see [Your sites, your rules](#your-sites-your-rules)).
 - **Stop session**: ends the session and shows your summary.
 - **Start a session…** (when idle): asks for a goal and a length.
+- **Start with another persona…** (when idle)
 - **Quit ApexCompanion**
+
+If your menu bar is crowded, macOS can hide the ◉ icon behind the camera notch on MacBooks. Quit a few menu bar apps, or use a bar manager, if you don't see it.
 
 ## What it does
 

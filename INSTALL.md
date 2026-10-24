@@ -33,7 +33,7 @@ ApexCompanion has no window. It lives in your menu bar (top right of the screen)
    - **The Closer**: an arrogant big-shot dealmaker.
    - **The Whip**: a cold, slow-talking Southern political operator.
 
-   It remembers your pick, so you won't be asked again unless you choose **Switch persona**.
+   It remembers your pick, so you won't be asked again unless you choose **Start with another persona…** from the menu bar.
 4. **Tell it your sites.** Two quick questions:
    - *Sites or apps you NEVER want to get lost in*: type them with commas, for example `reddit, instagram, steam`.
    - *Anything that should ALWAYS count as work?*: optional, for example `figma`. Click **Skip** if nothing comes to mind.
@@ -68,9 +68,12 @@ The menu shows **Working on:** your goal and **Focused 23 of 50 min**, then:
   - YouTube Shorts always counts as distracting, unless you put it under `[ok]`.
 - **Stop session**: ends the session and shows your summary.
 - **Start a session…** (when no session is running): asks what you're working on and for how long.
+- **Start with another persona…** (when no session is running)
 - **Quit ApexCompanion**: closes it completely, menu bar icon included.
 
-Opening ApexCompanion again (from Applications, Launchpad or Spotlight) still works too, and it's where you choose **Switch persona** to change coach.
+Don't see the ◉ icon? On MacBooks with a notch, macOS hides menu bar icons when the bar is full. Quit a few menu bar apps and it appears.
+
+Opening ApexCompanion again (from Applications, Launchpad or Spotlight) still works too, and it offers **Switch persona** too.
 
 Restarting or logging out of your Mac also stops the coach. Open the app to start it again.
 
