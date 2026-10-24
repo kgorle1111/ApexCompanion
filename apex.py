@@ -192,7 +192,7 @@ def main() -> None:
                 continue
             finally:
                 Path(shot).unlink(missing_ok=True)  # privacy claim: no frame outlives its check
-            hit = rules.match(user_rules.current(), app_name, url, v["app"], v["content"])
+            hit = rules.match(user_rules.current(), app_name, url)
             v["rule"] = None
             if hit:  # the user's list beats the model, both ways
                 v["state"], v["rule"] = hit

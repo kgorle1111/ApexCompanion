@@ -77,3 +77,20 @@ def test_failed_capture_skips_one_check_not_the_session(monkeypatch, tmp_path):
     assert "screencapture failed" in seen["log"][0]["error"]
     assert seen["log"][1]["state"] == "working"
     assert not Path(seen["screencapture"][0]).exists()  # no frame outlives its check
+
+
+def test_on_screen_text_cannot_trigger_a_rule(monkeypatch, tmp_path):
+    # A terminal printing "netflix" is still work: the model read it, but rules only see app + URL.
+    terminal = {**WORKING, "app": "Netflix", "content": "curl https://netflix.com in a terminal"}
+    sites = "[distracting]\nnetflix\n"
+    seen = run_main(monkeypatch, tmp_path, checks=1, verdict=terminal, front_app="Terminal", sites=sites)
+    assert (seen["log"][0]["state"], seen["log"][0]["rule"]) == ("working", None)
+
+
+def test_on_screen_text_cannot_suppress_a_verdict(monkeypatch, tmp_path):
+    # A "3Blue1Brown" link in a sidebar doesn't make the cat video next to it OK.
+    cats = {"app": "YouTube", "content": "cat video, 3Blue1Brown in sidebar", "category": "entertainment"}
+    cats |= {"state": "distracted", "latency_s": 0.1}
+    url = "https://www.youtube.com/watch?v=cats"
+    seen = run_main(monkeypatch, tmp_path, checks=1, verdict=cats, front_app="Safari", url=url, sites="[ok]\n3blue1brown\n")
+    assert (seen["log"][0]["state"], seen["log"][0]["rule"]) == ("distracted", None)
