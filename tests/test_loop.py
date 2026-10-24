@@ -75,7 +75,7 @@ def run_main(
     monkeypatch.setattr(apex, "LOG_DIR", tmp_path / "logs")
     monkeypatch.setattr(rules, "front_app", lambda: front_app)
     monkeypatch.setattr(rules, "front_url", lambda app: url)
-    monkeypatch.setattr(rules, "in_meeting", lambda app, u: meeting, raising=False)
+    monkeypatch.setattr(rules, "in_meeting", lambda app, u: meeting)
     monkeypatch.setenv("APEX_SCREEN_OK", "1")
 
     clock = [1_800_000_000.0]

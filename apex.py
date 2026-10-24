@@ -320,7 +320,7 @@ def main() -> None:
                 t = time.perf_counter()
                 app_name = "" if args.image else rules.front_app()
                 url = rules.front_url(app_name) if app_name else ""
-                meeting = getattr(rules, "in_meeting", lambda a, u: False)(app_name, url)
+                meeting = rules.in_meeting(app_name, url)
                 hit = None if meeting else rules.match(user_rules.current(), app_name, url)
                 timing["rules_s"] = round(time.perf_counter() - t, 4)
                 if meeting:  # counted as working so a call doesn't cost focus %; nothing is captured or said
