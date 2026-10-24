@@ -84,7 +84,9 @@ def warm_up(gemma) -> None:
 def capture(path: str) -> str:
     r = subprocess.run(["screencapture", "-x", "-t", "jpg", path], capture_output=True)
     if r.returncode != 0 or not Path(path).exists() or Path(path).stat().st_size == 0:
-        sys.exit(
+        # Not sys.exit: SystemExit escapes the loop's `except Exception`, and a locked screen or sleeping
+        # display fails capture transiently; that must skip one check, not end the session.
+        raise RuntimeError(
             "screencapture failed. Grant Screen Recording to this terminal app "
             "(System Settings → Privacy & Security → Screen Recording), then restart it."
         )
