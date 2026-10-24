@@ -1,0 +1,226 @@
+[
+  {
+    "file": "web/w_github_source.jpg",
+    "label": "working",
+    "source": "https://github.com/psf/requests/blob/main/src/requests/sessions.py",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "GitHub source file view"
+  },
+  {
+    "file": "web/w_python_docs.jpg",
+    "label": "working",
+    "source": "https://docs.python.org/3/library/asyncio-task.html",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "Python stdlib docs"
+  },
+  {
+    "file": "web/w_mdn_docs.jpg",
+    "label": "working",
+    "source": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "MDN reference"
+  },
+  {
+    "file": "web/w_stackoverflow.jpg",
+    "label": "working",
+    "source": "https://stackoverflow.com/questions/231767/what-does-the-yield-keyword-do-in-python",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "Stack Overflow Q&A, cookie banner bottom-left"
+  },
+  {
+    "file": "web/w_arxiv.jpg",
+    "label": "working",
+    "source": "https://arxiv.org/abs/1706.03762",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "arXiv abstract page"
+  },
+  {
+    "file": "web/w_yt_python_tutorial_ad.jpg",
+    "label": "working",
+    "source": "https://www.youtube.com/watch?v=rfscVS0vtbw",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "freeCodeCamp Python course watch page; a pre-roll ad (office scene) is playing in the player - title/sidebar are coding"
+  },
+  {
+    "file": "web/w_yt_3b1b_lecture.jpg",
+    "label": "working",
+    "source": "https://www.youtube.com/watch?v=aircAruvnKk",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "3Blue1Brown neural network lecture"
+  },
+  {
+    "file": "web/w_khan_video.jpg",
+    "label": "working",
+    "source": "https://www.khanacademy.org/math/linear-algebra/vectors-and-spaces/vectors/v/vector-introduction-linear-algebra",
+    "ambiguous": false,
+    "holdout": true,
+    "note": "Khan Academy video page with donation modal + cookie panel over it"
+  },
+  {
+    "file": "web/w_colab_notebook.jpg",
+    "label": "working",
+    "source": "https://colab.research.google.com/github/jakevdp/PythonDataScienceHandbook/blob/master/notebooks/02.02-The-Basics-Of-NumPy-Arrays.ipynb",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "Colab notebook (NumPy chapter)"
+  },
+  {
+    "file": "web/w_leetcode.jpg",
+    "label": "working",
+    "source": "https://leetcode.com/problems/two-sum/description/",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "LeetCode problem + editor"
+  },
+  {
+    "file": "web/w_rust_book.jpg",
+    "label": "working",
+    "source": "https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html",
+    "ambiguous": false,
+    "holdout": true,
+    "note": "Rust book chapter"
+  },
+  {
+    "file": "web/w_github_pr_diff.jpg",
+    "label": "working",
+    "source": "https://github.com/python/cpython/pull/1/files",
+    "ambiguous": false,
+    "holdout": true,
+    "note": "GitHub PR diff"
+  },
+  {
+    "file": "web/d_yt_cats.jpg",
+    "label": "distracted",
+    "source": "https://www.youtube.com/watch?v=tpiyEe_CqB4",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "cat compilation watch page"
+  },
+  {
+    "file": "web/d_yt_home_feed.jpg",
+    "label": "distracted",
+    "source": "https://www.youtube.com/",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "YouTube home feed (MrBeast, Shorts); one tech thumbnail"
+  },
+  {
+    "file": "web/d_yt_minecraft.jpg",
+    "label": "distracted",
+    "source": "https://www.youtube.com/watch?v=AHZU3YNkWxY",
+    "ambiguous": false,
+    "holdout": true,
+    "note": "Minecraft funny moments compilation"
+  },
+  {
+    "file": "web/d_imgur_viral.jpg",
+    "label": "distracted",
+    "source": "https://imgur.com/hot",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "Imgur viral feed (substitute for Reddit r/funny - Reddit blocked with bot/login wall)"
+  },
+  {
+    "file": "web/d_x_profile.jpg",
+    "label": "distracted",
+    "source": "https://x.com/NASA",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "X profile timeline, logged out (explore requires login)"
+  },
+  {
+    "file": "web/d_tiktok_profile.jpg",
+    "label": "distracted",
+    "source": "https://www.tiktok.com/@nba",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "TikTok profile; video grid failed to load ('Something went wrong')"
+  },
+  {
+    "file": "web/d_amazon_product.jpg",
+    "label": "distracted",
+    "source": "https://www.amazon.com/dp/B0D1XD1ZV3",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "Amazon AirPods product page"
+  },
+  {
+    "file": "web/d_twitch_stream.jpg",
+    "label": "distracted",
+    "source": "https://www.twitch.tv/stableronaldo",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "Twitch IRL stream with chat; cookie banner on top"
+  },
+  {
+    "file": "web/d_game_2048.jpg",
+    "label": "distracted",
+    "source": "https://play2048.co/",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "2048 browser game with ads"
+  },
+  {
+    "file": "web/d_netflix_landing.jpg",
+    "label": "distracted",
+    "source": "https://www.netflix.com/",
+    "ambiguous": false,
+    "holdout": true,
+    "note": "Netflix logged-out landing"
+  },
+  {
+    "file": "web/d_espn.jpg",
+    "label": "distracted",
+    "source": "https://www.espn.com/",
+    "ambiguous": false,
+    "holdout": true,
+    "note": "ESPN front page"
+  },
+  {
+    "file": "web/a_yt_lofi.jpg",
+    "label": "working",
+    "source": "https://www.youtube.com/watch?v=jfKfPfyJRdk",
+    "ambiguous": true,
+    "holdout": false,
+    "note": "lofi 'beats to study to' page; player shows 'Video unavailable' in headless; background music is arguably fine"
+  },
+  {
+    "file": "web/a_wikipedia_random.jpg",
+    "label": "distracted",
+    "source": "https://en.wikipedia.org/wiki/Special:Random",
+    "ambiguous": true,
+    "holdout": false,
+    "note": "random bio article (Stuart Boon) + donation banner; rabbit-hole unless task-related"
+  },
+  {
+    "file": "web/a_hackernews.jpg",
+    "label": "working",
+    "source": "https://news.ycombinator.com/",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "HN front page: tech, but procrastination-browsing | USER RULING 2026-10-24: working (news/tech-news front pages are not distraction)"
+  },
+  {
+    "file": "web/a_slack_landing.jpg",
+    "label": "working",
+    "source": "https://slack.com/",
+    "ambiguous": true,
+    "holdout": false,
+    "note": "Slack marketing landing (not an actual workspace)"
+  },
+  {
+    "file": "web/a_cnn_news.jpg",
+    "label": "working",
+    "source": "https://www.cnn.com/",
+    "ambiguous": false,
+    "holdout": false,
+    "note": "CNN homepage behind legal/privacy modal; news browsing | USER RULING 2026-10-24: working (news/tech-news front pages are not distraction)"
+  }
+]
