@@ -8,7 +8,7 @@ requires-python = ">=3.12"
 dependencies = ["mlx-vlm==0.7.10", "pillow"]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff==0.14.0"]
+dev = ["pytest==9.1.1", "ruff==0.14.0"]
 
 [tool.ruff]
 line-length = 120

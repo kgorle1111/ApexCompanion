@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -12,23 +15,29 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          version: "0.11.21"
       - run: uvx ruff@0.14.0 check .
       - run: uvx ruff@0.14.0 format --check .
 
   test:
     # MLX only ships Apple Silicon wheels; tests never load the model weights.
     runs-on: macos-14
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
+          version: "0.11.21"
           enable-cache: true
       - run: uv venv --python 3.12
       # An app, not a library: install its dependencies, never build it as a package.
-      - run: uv pip install -r pyproject.toml --extra dev
+      # -c: test against the exact pinned set the launcher installs for users, not whatever resolves today.
+      - run: uv pip install -r pyproject.toml --extra dev -c packaging/constraints.txt
       - name: pytest
         run: |
           set +e
@@ -36,3 +45,12 @@ jobs:
           code=$?
           [ $code -eq 5 ] && echo "no tests collected yet" && exit 0
           exit $code
+
+  package:
+    # Compile check only (no signing/zip): flags match packaging/build_app.sh.
+    runs-on: macos-14
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: bash -n packaging/launcher.sh
+      - run: swiftc -O -target arm64-apple-macos14.0 packaging/main.swift -o "$RUNNER_TEMP/ApexCompanion"
