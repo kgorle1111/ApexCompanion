@@ -45,6 +45,28 @@ def test_rules_never_read_model_text():
         rules.match(r, "Terminal", "", "Netflix", "curl netflix.com")
 
 
+def test_youtube_shorts_is_always_distracted():
+    none = rules.parse("")
+    for url in (
+        "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+        "https://m.youtube.com/shorts/abc?feature=share",
+        "https://youtube.com/shorts",
+    ):
+        assert rules.match(none, "Google Chrome", url) == ("distracted", "youtube.com/shorts"), url
+    for url in (
+        "https://www.youtube.com/watch?v=abc",
+        "https://www.youtube.com/shortsfoo",
+        "https://notyoutube.com/shorts/abc",
+        "https://example.com/?next=https://www.youtube.com/shorts/abc",
+    ):
+        assert rules.match(none, "Google Chrome", url) is None, url
+
+
+def test_user_ok_beats_shorts_guard():
+    r = rules.parse("[ok]\nyoutube\n")
+    assert rules.match(r, "Safari", "https://www.youtube.com/shorts/abc") == ("working", "youtube")
+
+
 def test_host():
     assert rules.host("https://www.YouTube.com/shorts/abc") == "www.youtube.com"
     assert rules.host("") == ""

@@ -93,7 +93,22 @@ def match(rules: dict[str, list[str]], front_app: str, url: str) -> tuple[str, s
     for term in rules["distracting"]:
         if _hit(term, haystack):
             return "distracted", term
+    if _is_shorts(url):
+        return "distracted", SHORTS
     return None
+
+
+SHORTS = "youtube.com/shorts"
+
+
+def _is_shorts(url: str) -> bool:
+    # Built in because the model can't be trusted here: the one clear-cut blind-eval miss was a Short it
+    # called educational_video. Host + path, so "youtube.com/shorts" inside a query string doesn't count.
+    h = host(url)
+    if h != "youtube.com" and not h.endswith(".youtube.com"):
+        return False
+    path = urlsplit(url).path.lower()
+    return path == "/shorts" or path.startswith("/shorts/")
 
 
 class Rules:
