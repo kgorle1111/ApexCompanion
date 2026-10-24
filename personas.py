@@ -126,7 +126,7 @@ def _persona(persona: str) -> dict:
     return PERSONAS[persona]
 
 
-def roast_prompt(persona: str, app: str, content: str, strike: int) -> str:
+def roast_prompt(persona: str, app: str, content: str, strike: int, goal: str = "") -> str:
     p = _persona(persona)
     strike = max(1, int(strike))
     escalation = _ESCALATION.get(strike) or _ESCALATION_MAX.format(n=strike)
@@ -137,8 +137,15 @@ def roast_prompt(persona: str, app: str, content: str, strike: int) -> str:
         "The user is supposed to be working, but a screen check just caught them slacking. "
         f"Deliver one roast, out loud, in character.\n{escalation}\n{_RULES}\n\n"
         f"Examples of your voice:\n{shots}\n\n"
+        f"{_goal_line(goal)}"
         f"Screen: {_sanitize(app, 60)} - {_sanitize(content, 120)}\nLine:"
     )
+
+
+def _goal_line(goal: str) -> str:
+    # Roast only, never the classifier: the verdict eval stays valid, and an empty goal leaves the prompt unchanged.
+    text = re.sub(r"\s+", " ", str(goal or "")).replace('"', "'").strip()[:120].rstrip(" .")
+    return f"They said they'd be working on: {text}. Contrast that with what's on screen.\n" if text else ""
 
 
 def praise_prompt(persona: str, minutes_focused: int) -> str:
