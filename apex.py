@@ -49,6 +49,8 @@ class Coach:
 def require_screen_permission() -> None:
     """Without permission screencapture still succeeds but returns only the wallpaper, so the coach
     would silently call everything 'working'. Refuse to start instead."""
+    if os.environ.get("APEX_SCREEN_OK") == "1":  # the app bundle already checked via CoreGraphics
+        return
     try:
         r = subprocess.run(
             ["swift", "-e", "import CoreGraphics; print(CGPreflightScreenCaptureAccess())"],
