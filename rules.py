@@ -119,6 +119,61 @@ def _is_shorts(url: str) -> bool:
     return path == "/shorts" or path.startswith("/shorts/")
 
 
+# Exact LSDisplayName, lowercased. Discord and Slack are left out on purpose: both are mostly chat, and a
+# huddle or voice channel can't be told apart from scrolling. Zoom/Teams with only chat open also count
+# (kn: frontmost-app proxy; a mic-in-use check would tell a call from a chat if false quiets annoy people).
+_CALL_APPS = frozenset(
+    {
+        "zoom.us",
+        "zoom",
+        "microsoft teams",
+        "microsoft teams (work or school)",
+        "microsoft teams classic",
+        "teams",
+        "facetime",
+        "webex",
+        "cisco webex meetings",
+        "around",
+        "tuple",
+        "google meet",
+    }
+)
+_MEET_CODE = re.compile(r"/[a-z]{3}-[a-z]{4}-[a-z]{3}/?")
+# Whereby rooms are a bare /<room>; these first segments are its own site, not rooms.
+# kn: denylist of known site pages; a new marketing path reads as a call until added here.
+_WHEREBY_SITE = frozenset({"information", "user", "org", "login", "signup", "pricing", "blog"})
+
+
+def _on(h: str, domain: str) -> bool:
+    return h == domain or h.endswith("." + domain)
+
+
+def in_meeting(front_app: str, url: str) -> bool:
+    """True when the user is on a call, so the coach stays quiet. Frontmost app name or the active tab's
+    host + path only: a query string or page text mentioning meet.google.com is not a call."""
+    if front_app.strip().lower() in _CALL_APPS:
+        return True
+    h = host(url)
+    if not h:
+        return False
+    try:
+        path = urlsplit(url).path.lower()
+    except ValueError:
+        return False
+    segments = [s for s in path.split("/") if s]
+    if h == "meet.google.com":
+        return _MEET_CODE.fullmatch(path) is not None
+    if _on(h, "zoom.us"):
+        return path.startswith(("/j/", "/wc/"))
+    if h == "teams.microsoft.com":
+        return "meetup-join" in segments
+    if h == "teams.live.com":
+        return segments[:1] == ["meet"]
+    if _on(h, "whereby.com"):
+        return len(segments) == 1 and segments[0] not in _WHEREBY_SITE
+    return False
+
+
 class Rules:
     """Reloads the file when it changes, so edits in TextEdit apply live."""
 
