@@ -69,6 +69,14 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:5
 .reqbox .reqh{font:600 12.5px/1.2 var(--mono);color:var(--mute);margin-bottom:8px}
 .reqbox ul{margin:0;padding-left:18px;display:grid;gap:6px;font-size:14.5px;line-height:1.45;color:var(--mute)}
 .reqbox b{color:var(--ink);font-weight:650}
+.flowlist{margin:22px 0 0;padding:0;list-style:none;display:grid;gap:8px;max-width:62ch;counter-reset:step}
+.flowlist li{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:15px;line-height:1.45;color:var(--mute);counter-increment:step}
+.flowlist li::before{content:counter(step);font:700 12px/22px var(--mono);text-align:center;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);color:var(--red-ink)}
+.flowlist b{color:var(--ink);font-weight:650}
+.flowh{margin-top:24px;font:600 12.5px/1.2 var(--mono);color:var(--mute)}
+.next{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:8px;font-size:15px;color:var(--mute)}
+.next li{padding-left:16px;position:relative}
+.next li::before{content:"";position:absolute;left:0;top:.65em;width:6px;height:6px;border-radius:50%;background:var(--dim)}
 .devlbl{margin-top:22px;font:600 12.5px/1.2 var(--mono);color:var(--dim)}
 .devlbl + .runline{margin-top:8px}
 
@@ -242,21 +250,29 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
   <div class="wrap">
     <div>
       <h1>Your screen<br>has a <em>witness.</em></h1>
-      <p class="lede">ApexCompanion looks at your screen every 10 seconds with Gemma 4, running on your own Mac. Drift off task and it calls you out <b>out loud</b>, in the voice of a coach with no patience for you.</p>
+      <p class="lede">ApexCompanion looks at your screen every 10 seconds with Gemma 4, running on your own Mac. Tell it what you're working on, and it sits in your menu bar counting your focused minutes. Drift off task and it calls you out <b>out loud</b>, in the voice of a coach with no patience for you.</p>
       <p class="self">Built for watching yourself: no accounts, no remote reporting. Install it only on your own Mac.</p>
       <p class="analogy">A personal trainer who watches every rep <span>and never posts the footage.</span></p>
       <div class="cta">
         <a class="btn" href="https://github.com/kgorle1111/ApexCompanion/releases/latest/download/ApexCompanion.zip">Download for Mac</a>
         <a class="btn ghost" href="#how">See how it works &darr;</a>
       </div>
+      <p class="flowh">How a session looks</p>
+      <ol class="flowlist">
+        <li><span><b>Set a goal.</b> Say what you're working on and pick 25, 50 or 90 minutes, or no limit.</span></li>
+        <li><span><b>Focus.</b> The menu bar shows <code>&#9673; 23m</code> as your focused minutes add up. No praise out loud, so nothing interrupts you.</span></li>
+        <li><span><b>Drift, get roasted.</b> Two distracted checks in a row and your coach names what's on screen and what you said you'd be doing.</span></li>
+        <li><span><b>Summary.</b> When the time is up, the session ends and shows how you did.</span></li>
+      </ol>
       <div class="reqbox" role="note" aria-label="Before you download">
         <p class="reqh">Before you download</p>
         <ul>
           <li><b>Your Mac:</b> Apple silicon (M1 or later), macOS 14 or newer, 16 GB of memory (8 GB Macs: not recommended, it will badly slow your Mac).</li>
           <li><b>Space:</b> about 8.3 GB one-time download. Keep about 12 GB of disk free.</li>
           <li><b>First open:</b> macOS will warn you because the app is not notarized. Go to System Settings &rarr; Privacy &amp; Security and click <b>Open Anyway</b>.</li>
-          <li><b>No window:</b> it lives in your notifications. Open the app again to stop it or change your sites.</li>
-          <li><b>Shared spaces:</b> it speaks out loud and names what is on your screen. Mute your Mac when others can hear.</li>
+          <li><b>No window:</b> it lives in your menu bar. Pause, stop, or edit your sites from there.</li>
+          <li><b>Shared spaces:</b> it speaks out loud and names what is on your screen. Choose <b>Mute voice</b> in the menu bar when others can hear; notifications still show.</li>
+          <li><b>Calls:</b> while Zoom, Teams, FaceTime, Webex, Around, Tuple or a Meet tab is in front, it takes no screenshot and says nothing.</li>
         </ul>
       </div>
       <p class="devlbl">Developers: run from source</p>
@@ -468,6 +484,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
         <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>No network calls while it runs.</b> The model loads from local disk (<code>HF_HUB_OFFLINE=1</code>). Setup is the one time it goes online: the first run downloads uv, Python with about 850 MB of packages, and the 8.3 GB model.</span></li>
         <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Screenshots stay on the machine, then get deleted.</b> Each capture is removed after its check. Inference, roast and voice all run locally on Apple silicon.</span></li>
         <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>A small local log, readable only by you.</b> App name, the site's host (not the full URL), and the screen description only when a roast fires. Delete it anytime.</span></li>
+        <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Off during calls and pauses.</b> With a call app or meeting tab in front, or while paused from the menu bar, it takes no screenshot and runs no model.</span></li>
         <li><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10" stroke="var(--green)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Keeps running with Wi-Fi off.</b> This page makes no third-party requests either: no outside fonts, scripts or trackers, only its own video and poster.</span></li>
       </ul>
     </div>
@@ -479,7 +496,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
   <div class="wrap">
     <div class="kicker">Pick your coach</div>
     <h2>Two coaches. Zero small talk.</h2>
-    <p class="lede">Each roast is generated fresh by Gemma 4 and refers to what's actually on your screen. Switch with one flag.</p>
+    <p class="lede">Each roast is generated fresh by Gemma 4 and refers to what's actually on your screen and the goal you set. The app remembers your coach; switch any time.</p>
 
     <div class="personas">
       <article class="persona closer">
@@ -490,7 +507,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
         <ul class="quotes">
           <li><span class="ctx">real output &middot; on a cat compilation</span>Are you actually watching cat videos when I'm trying to close a deal? Focus, or this conversation is over.</li>
           <li><span class="ctx">sample &middot; on a shopping cart</span>You're comparing sneakers like it's a merger. Nobody's acquiring you at this rate. Close the tab.</li>
-          <li><span class="ctx">sample &middot; after a long focus streak</span>Forty minutes of actual work. Don't let it go to your head. Keep closing.</li>
+          <li><span class="ctx">sample &middot; goal: lab report &middot; on a box score</span>You said you'd be working on the lab report. That's a box score. Close it and get back to the deal.</li>
         </ul>
       </article>
       <article class="persona whip">
@@ -501,7 +518,7 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
         <ul class="quotes">
           <li><span class="ctx">sample &middot; on a social feed</span>Friend, I've ended careers over less than twenty minutes of scrolling. Put that feed down.</li>
           <li><span class="ctx">sample &middot; on a game launcher</span>Now I know you didn't open that game on my time. Close it, and we'll pretend I didn't see.</li>
-          <li><span class="ctx">sample &middot; after a long focus streak</span>Well, look at you, actually earning your keep. I'll remember that. I remember everything.</li>
+          <li><span class="ctx">sample &middot; goal: essay draft &middot; on a video feed</span>You told me you'd be writing that essay, friend. I don't see an essay. I see a feed.</li>
         </ul>
       </article>
     </div>
@@ -586,6 +603,13 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
         <h3>Developers: run from source</h3>
         <div class="runline" style="margin-top:14px"><b>$</b> HF_HUB_OFFLINE=1 .venv/bin/python apex.py --persona whip</div>
         <p style="margin-top:14px">Needs macOS on Apple silicon and Screen Recording permission for your terminal. Ctrl-C ends the session and prints minutes focused and call-out count.</p>
+        <h3 style="margin-top:28px">What's next</h3>
+        <ul class="next">
+          <li>A one-click "That was work" correction from the notification.</li>
+          <li>Skip the vision model when the front app or page hasn't changed, with battery drain measured.</li>
+          <li>Capture every display, not just the main one.</li>
+          <li>Evaluate on real desktop and native-app screenshots labeled by someone other than the author.</li>
+        </ul>
         <p style="margin-top:12px">Source code, eval labels and results, and install guide: <a href="https://github.com/kgorle1111/ApexCompanion">github.com/kgorle1111/ApexCompanion</a>. Apple Silicon, macOS 14+.</p>
       </div>
     </div>
