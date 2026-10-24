@@ -5,6 +5,8 @@
 # Test env:  APEX_NONINTERACTIVE=1  APEX_PERSONA=closer|whip  APEX_ACTION="Stop"|"Switch persona"|...
 #            APEX_BLOCK / APEX_ALLOW (first-run site answers)  APEX_TEST_ARGS="--image F --mute"
 #            (test args skip the Screen Recording gate: apex.py doesn't capture with --image).
+#            APEX_GOAL / APEX_MINUTES (skip the goal + length dialogs; set even when empty)
+#            APEX_PICK_PERSONA=1 (ask for the persona even if one is saved; the menu bar sets it)
 set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"            # Contents/Resources
@@ -12,6 +14,7 @@ APP_SRC="$HERE/app"
 APP_BIN="${APEX_APP_BIN:-$HERE/../MacOS/ApexCompanion}"
 APEX_HOME="${APEX_HOME:-$HOME/Library/Application Support/ApexCompanion}"
 NONINT="${APEX_NONINTERACTIVE:-0}"
+FORCE_PICK="${APEX_PICK_PERSONA:-0}"
 MODEL_ID="mlx-community/gemma-4-e4b-it-8bit"
 MODEL_CACHE_NAME="models--mlx-community--gemma-4-e4b-it-8bit"
 VENV="$APEX_HOME/venv"
@@ -20,6 +23,8 @@ WORK="$APEX_HOME/app"
 PIDFILE="$APEX_HOME/coach.pid"
 CONFIG="$APEX_HOME/config"
 SITES="$APEX_HOME/sites.txt"
+STATE="$APEX_HOME/state.json"      # written by the coach, read by the menu bar
+CONTROL="$APEX_HOME/control.json"  # written by the menu bar, read by the coach
 LOGDIR="$APEX_HOME/logs"
 LOCK="$APEX_HOME/setup.lock"
 DEPS_STAMP="mlx-vlm==0.7.10 pillow constraints-v1"
@@ -101,18 +106,28 @@ coach_pid() {
     return 1
 }
 
-show_summary() {  # the session's numbers, read from its own log; never fatal
-    local s
+show_summary() {  # show_summary [HEADING]: the session's numbers, read from its own log; never fatal
+    local s head="${1:-Coach stopped.}"
     s="$(cd "$WORK" 2>/dev/null && "$PY" report.py --dir "$LOGDIR" 2>/dev/null)"
     if [ -n "$s" ]; then
-        dialog "Coach stopped. Your session:
+        dialog "$head Your session:
 
 $s
 
-Open ApexCompanion to start again." "OK" "OK" >/dev/null
+Start another from ◉ Apex in the menu bar." "OK" "OK" >/dev/null
     else
-        notify "Coach stopped. Open ApexCompanion to start again."
+        notify "$head Start another from ◉ Apex in the menu bar."
     fi
+}
+
+stop_reason() {  # the coach's own account of why it stopped: "user", "timer" or ""
+    "$PY" -I -c 'import json,sys; print(json.load(open(sys.argv[1])).get("stop_reason") or "")' "$STATE" 2>/dev/null
+}
+
+reset_session_files() {  # a new session must not inherit the last one's stop flag or final state
+    local tmp="$APEX_HOME/.control.json.$$"
+    rm -f "$STATE"
+    ( umask 077; printf '{"muted": false, "paused_until": null, "stop": false}\n' > "$tmp" ) && mv -f "$tmp" "$CONTROL"
 }
 
 stop_coach() {
@@ -141,7 +156,7 @@ control_menu() {
     log "control menu: '${pick}' (pid $pid)"
     case "$pick" in
         "Stop") stop_coach; show_summary ;;
-        "Switch persona") stop_coach; start_flow ;;
+        "Switch persona") stop_coach; FORCE_PICK=1; start_flow ;;
         "Edit my sites") open_sites ;;
         *) : ;;
     esac
@@ -239,6 +254,8 @@ pick_persona() {
     local def="$LABEL_CLOSER"; [ "$last" = whip ] && def="$LABEL_WHIP"
     if [ "$NONINT" = 1 ] && [ -n "${APEX_PERSONA:-}" ]; then
         [ "$APEX_PERSONA" = whip ] && def="$LABEL_WHIP" || def="$LABEL_CLOSER"
+    elif [ "$FORCE_PICK" != 1 ] && { [ "$last" = closer ] || [ "$last" = whip ]; }; then
+        PERSONA="$last"; log "persona: $PERSONA (saved)"; return 0   # asked once; switch from the menus
     fi
     local pick; pick="$(choose "Pick your coach:" "$def" "$LABEL_CLOSER" "$LABEL_WHIP")"
     case "$pick" in
@@ -260,6 +277,26 @@ onboard_sites() {
     cfg_set onboarded 1
 }
 
+ask_session() {  # sets GOAL and MINUTES (0 = no limit)
+    if [ -n "${APEX_GOAL+x}" ]; then GOAL="$APEX_GOAL"; else GOAL="$(ask_text "What are you working on?" APEX_GOAL)"; fi
+    GOAL="$(printf '%s' "$GOAL" | tr -d '\000-\037\177')"   # one line, no control characters
+    if [ -n "${APEX_MINUTES+x}" ]; then
+        [[ "$APEX_MINUTES" =~ ^[0-9]+$ ]] && [ "$APEX_MINUTES" -le 1440 ] || fail "APEX_MINUTES must be 0-1440 (got '$APEX_MINUTES')."
+        MINUTES="$APEX_MINUTES"
+    else
+        local last def="50 minutes" pick; last="$(cfg_get minutes)"
+        case "$last" in 25|50|90) def="$last minutes" ;; 0) def="No limit" ;; esac
+        pick="$(choose "How long is this session?" "$def" "25 minutes" "50 minutes" "90 minutes" "No limit")"
+        case "$pick" in
+            "25 minutes") MINUTES=25 ;; "50 minutes") MINUTES=50 ;; "90 minutes") MINUTES=90 ;;
+            "No limit") MINUTES=0 ;;
+            *) log "session length cancelled"; exit 0 ;;
+        esac
+        cfg_set minutes "$MINUTES"
+    fi
+    log "session: ${MINUTES} min, goal ${#GOAL} chars"
+}
+
 screen_permission_ok() {
     if [ -n "${APEX_TEST_ARGS:-}" ]; then log "test args set: skipping Screen Recording gate"; return 0; fi
     local r; r="$("$APP_BIN" --preflight 2>>"$LOGDIR/launcher.log")"
@@ -278,12 +315,13 @@ screen_permission_ok() {
 }
 
 run_coach() {
-    local args=(apex.py --persona "$PERSONA" --sites "$SITES")
+    local args=(apex.py --persona "$PERSONA" --sites "$SITES" --goal "$GOAL" --minutes "$MINUTES" --state-dir "$APEX_HOME")
     if [ -n "${APEX_TEST_ARGS:-}" ]; then read -r -a extra <<< "$APEX_TEST_ARGS"; args+=("${extra[@]}"); fi
     log "starting coach: ${args[*]} (HF_HOME=${MODEL_HF_HOME:-default})"
     printf '\n===== %s start %s =====\n' "$(date '+%F %T')" "$PERSONA" >> "$LOGDIR/apex.log"
     # The app has no window, so this notification is the only place a new user learns how to stop it.
-    notify "Watching as $(persona_name "$PERSONA"). Open ApexCompanion again to stop or edit your sites."
+    notify "Watching as $(persona_name "$PERSONA"). Pause, mute or stop from ◉ in the menu bar."
+    reset_session_files
     # Foreground subshell, exec'd into python: the pid is known for the pidfile, Ctrl-C (SIGINT)
     # still reaches python (bash ignores SIGINT only for background jobs), and the app host keeps
     # running as python's parent for as long as the coach runs.
@@ -308,6 +346,11 @@ run_coach() {
 $(tail -n 4 "$LOGDIR/apex.log" | cut -c1-200)
 
 Open ApexCompanion to try again. Full log: $LOGDIR/apex.log" "OK" "OK" >/dev/null
+    else
+        case "$(stop_reason)" in   # stopped from the menu bar, or the session timer ran out
+            user) show_summary ;;
+            timer) show_summary "Time's up." ;;
+        esac
     fi
     return "$rc"
 }
@@ -330,6 +373,7 @@ start_flow() {
     pick_persona
     onboard_sites
     screen_permission_ok || exit 0
+    ask_session
     rm -rf "$LOCK"; trap - EXIT
     run_coach
 }
