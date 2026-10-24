@@ -94,3 +94,26 @@ def test_on_screen_text_cannot_suppress_a_verdict(monkeypatch, tmp_path):
     url = "https://www.youtube.com/watch?v=cats"
     seen = run_main(monkeypatch, tmp_path, checks=1, verdict=cats, front_app="Safari", url=url, sites="[ok]\n3blue1brown\n")
     assert (seen["log"][0]["state"], seen["log"][0]["rule"]) == ("distracted", None)
+
+
+def test_rule_hit_skips_screenshot_and_model(monkeypatch, tmp_path):
+    url = "https://www.reddit.com/r/funny/"
+    seen = run_main(monkeypatch, tmp_path, checks=1, front_app="Safari", url=url, sites="[distracting]\nreddit\n")
+    assert seen["screencapture"] == [] and seen["classify"] == []
+    rec = seen["log"][0]
+    assert (rec["state"], rec["rule"], rec["category"], rec["action"]) == ("distracted", "reddit", "rule", "roast")
+    assert "Screen: Safari - www.reddit.com" in seen["roast_prompt"][0]  # the roast still names the site
+
+
+def test_shorts_guard_needs_no_model(monkeypatch, tmp_path):
+    url = "https://www.youtube.com/shorts/abc"
+    seen = run_main(monkeypatch, tmp_path, checks=1, front_app="Google Chrome", url=url)
+    assert seen["classify"] == []
+    assert (seen["log"][0]["state"], seen["log"][0]["rule"]) == ("distracted", "youtube.com/shorts")
+
+
+def test_rule_miss_still_asks_the_model(monkeypatch, tmp_path):
+    url = "https://docs.python.org/3/"
+    seen = run_main(monkeypatch, tmp_path, checks=1, front_app="Safari", url=url, sites="[distracting]\nreddit\n")
+    assert len(seen["classify"]) == 1 and seen["classify"][0][1]  # the frame existed while it was read
+    assert not Path(seen["classify"][0][0]).exists()

@@ -181,8 +181,13 @@ def main() -> None:
             try:
                 app_name = "" if args.image else rules.front_app()
                 url = rules.front_url(app_name) if app_name else ""
-                path = images.pop(0) if images else capture(shot)
-                v = gemma.classify(path)
+                hit = rules.match(user_rules.current(), app_name, url)
+                if hit:  # the user's list beats the model both ways, so no frame is taken or read at all
+                    v = {"app": app_name, "content": rules.host(url), "category": "rule", "latency_s": 0.0}
+                    v["state"], v["rule"] = hit
+                else:
+                    path = images.pop(0) if images else capture(shot)
+                    v = gemma.classify(path) | {"rule": None}
             except Exception as e:  # one bad frame must not end a live session
                 print(f"{time.strftime('%H:%M:%S')} check failed: {e!r}", file=sys.stderr, flush=True)
                 log.write(json.dumps({"t": time.time(), "error": repr(e)[:300]}) + "\n")
@@ -192,10 +197,6 @@ def main() -> None:
                 continue
             finally:
                 Path(shot).unlink(missing_ok=True)  # privacy claim: no frame outlives its check
-            hit = rules.match(user_rules.current(), app_name, url)
-            v["rule"] = None
-            if hit:  # the user's list beats the model, both ways
-                v["state"], v["rule"] = hit
             action = coach.observe(v["state"], time.monotonic())
             mark = "🟢" if v["state"] == "working" else "🔴"
             why = f"rule:{v['rule']}" if v["rule"] else v["category"]
