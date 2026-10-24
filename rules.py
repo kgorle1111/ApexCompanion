@@ -82,11 +82,19 @@ def host(url: str) -> str:
         return ""
 
 
+def _address(url: str) -> str:
+    # Host + path only: a search for "reddit" (?q=reddit) is not a visit to reddit.
+    try:
+        return urlsplit(url)._replace(query="", fragment="").geturl()
+    except ValueError:
+        return ""
+
+
 def match(rules: dict[str, list[str]], front_app: str, url: str) -> tuple[str, str] | None:
     """Return ("working"|"distracted", term) if a user rule applies. "ok" wins over "distracting".
     Trusted signals only: never the model's reading of the screen, which any page, sidebar or terminal
     output can steer (a "3blue1brown" sidebar link, a log line printing "netflix")."""
-    haystack = " | ".join(t.lower() for t in (front_app, url, host(url)) if t)
+    haystack = " | ".join(t.lower() for t in (front_app, _address(url), host(url)) if t)
     for term in rules["ok"]:
         if _hit(term, haystack):
             return "working", term
