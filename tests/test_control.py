@@ -63,17 +63,18 @@ def test_paused_only_before_paused_until(tmp_path):
     assert ctl.paused(99.9) and not ctl.paused(100)
 
 
-def test_remove_stale_deletes_file_and_forgets_values(tmp_path):
+def test_stop_older_than_session_is_ignored_but_other_fields_kept(tmp_path):
     path = tmp_path / "control.json"
-    path.write_text(json.dumps({"stop": True}))
-    ctl = control.Control(path)
-    assert ctl.current()["stop"]
-    ctl.remove_stale()
-    assert not path.exists() and ctl.current() == control.DEFAULTS
-    ctl.remove_stale()  # already gone is fine
+    path.write_text(json.dumps({"stop": True, "muted": True, "paused_until": 500}))
+    os.utime(path, (50, 50))
+    ctl = control.Control(path, since=100)
+    assert ctl.current() == {"paused_until": 500.0, "muted": True, "stop": False}
+    os.utime(path, (150, 150))  # the menu bar rewrote it after the session started
+    assert ctl.current()["stop"] is True
 
 
 def test_goal_is_one_line_and_capped():
     assert control.clean_goal("  write\nthe\r\n parser ") == "write the parser"
+    assert control.clean_goal("tax\x00 re\x1bturn\x7f\x85") == "tax return"
     assert len(control.clean_goal("x" * 500)) == control.GOAL_MAX
     assert control.clean_goal(None) == ""

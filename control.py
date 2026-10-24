@@ -13,7 +13,8 @@ DEFAULTS = {"paused_until": None, "muted": False, "stop": False}
 
 
 def clean_goal(text: str | None) -> str:
-    return re.sub(r"\s+", " ", str(text or "")).strip()[:GOAL_MAX]
+    text = re.sub(r"\s+", " ", str(text or ""))
+    return re.sub(r"[\x00-\x1f\x7f-\x9f]", "", text).strip()[:GOAL_MAX]
 
 
 def write_state(path: Path, state: dict) -> None:
@@ -53,15 +54,11 @@ def parse_control(text: str) -> dict:
 class Control:
     """Reloads control.json when it changes; missing or invalid means defaults."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, since: float | None = None):
         self.path = path
+        self.since = since
         self.key: tuple[int, int] | None = None
         self.values = dict(DEFAULTS)
-
-    def remove_stale(self) -> None:
-        # A stop flag left by the previous session would end this one on its first tick.
-        self.path.unlink(missing_ok=True)
-        self.key, self.values = None, dict(DEFAULTS)
 
     def current(self) -> dict:
         try:
@@ -76,6 +73,10 @@ class Control:
             except OSError:
                 text = ""
             self.values, self.key = parse_control(text), key
+            # A stop written before this session started belongs to the previous one. The file isn't deleted:
+            # a Pause or Mute clicked while the model loads must still apply.
+            if self.since is not None and st.st_mtime < self.since:
+                self.values["stop"] = False
         return self.values
 
     def paused(self, now: float) -> bool:

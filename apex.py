@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import resource
+import signal
 import subprocess
 import sys
 import tempfile
@@ -168,6 +169,11 @@ class Voice:
         self.proc = subprocess.Popen(["say", "-v", self.voice, "-r", str(self.rate), "--", text])
 
 
+def _graceful_term(signum, frame) -> None:
+    # The launcher's fallback is SIGTERM; take the Ctrl-C path so session_end, state.json and frame cleanup still run.
+    raise KeyboardInterrupt
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--persona", default="closer")
@@ -190,6 +196,7 @@ def main() -> None:
     )
     ap.add_argument("--log-days", type=float, default=7.0, help="delete session logs older than this (0 = keep all)")
     args = ap.parse_args()
+    session_t0 = time.time()
 
     import control  # noqa: E402  (after argparse so --help is instant)
     import personas  # noqa: E402
@@ -213,8 +220,7 @@ def main() -> None:
     ctl = None
     if args.state_dir:
         Path(args.state_dir).mkdir(mode=0o700, parents=True, exist_ok=True)
-        ctl = control.Control(Path(args.state_dir) / "control.json")
-        ctl.remove_stale()
+        ctl = control.Control(Path(args.state_dir) / "control.json", since=session_t0)
     started = last_mark = focused_s = 0.0
     ends_at: float | None = None
     last_state, last_line, stop_reason = "starting", None, None
@@ -272,25 +278,26 @@ def main() -> None:
         pruned_logs=pruned,
     )
     publish("starting")
-
-    print("loading Gemma 4 (local, offline)…", flush=True)
-    t0 = time.perf_counter()
-    import gemma  # noqa: E402
-
-    gemma.load_model()
-    warm_up(gemma)
-    load_s = time.perf_counter() - t0
-    print(f"model ready in {load_s:.1f}s", flush=True)
-    log.emit("model_ready", model=gemma.MODEL_ID, load_s=round(load_s, 2), rss_mb=peak_rss_mb())
     coach = Coach(args.streak, args.cooldown, args.praise_every)
     fd, shot = tempfile.mkstemp(prefix="apex_", suffix=".jpg")  # per-run: two instances can't clobber
     os.close(fd)
     images = list(args.image or [])
-    started = last_mark = time.time()
-    ends_at = started + args.minutes * 60 if args.minutes > 0 else None
     n = 0
+    prev_term = signal.signal(signal.SIGTERM, _graceful_term)
 
     try:
+        print("loading Gemma 4 (local, offline)…", flush=True)
+        t0 = time.perf_counter()
+        import gemma  # noqa: E402
+
+        gemma.load_model()
+        warm_up(gemma)
+        load_s = time.perf_counter() - t0
+        print(f"model ready in {load_s:.1f}s", flush=True)
+        log.emit("model_ready", model=gemma.MODEL_ID, load_s=round(load_s, 2), rss_mb=peak_rss_mb())
+        started = last_mark = time.time()
+        # Fixed at start: pausing doesn't extend it, the menu bar derives "of N min" from ends_at.
+        ends_at = started + args.minutes * 60 if args.minutes > 0 else None
         while True:
             tick = time.perf_counter()
             if args.image and not images:
@@ -420,6 +427,7 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)  # a second TERM must not cut session_end short
         Path(shot).unlink(missing_ok=True)
         if voice.proc:
             voice.proc.wait()
@@ -433,14 +441,15 @@ def main() -> None:
             praises=praises,
             guarded=guarded,
             focus_pct=round(focus_pct, 1),
-            duration_s=round(time.time() - started, 1),
+            duration_s=round(time.time() - started, 1) if started else 0.0,
             peak_rss_mb=peak_rss_mb(),
             stop_reason=stop_reason,
         )
         log.close()
         publish("stopped")
+        signal.signal(signal.SIGTERM, prev_term)
         print(
-            f"\nsession {(time.time() - started) / 60:.1f} min · {checks} checks · "
+            f"\nsession {(time.time() - started) / 60 if started else 0:.1f} min · {checks} checks · "
             f"focused {focus_pct:.0f}% · call-outs {coach.strikes}"
         )
 

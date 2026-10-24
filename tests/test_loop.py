@@ -2,8 +2,10 @@
 
 import json
 import os
+import signal
 import subprocess
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -78,7 +80,7 @@ def run_main(
     monkeypatch.setattr(rules, "in_meeting", lambda app, u: meeting)
     monkeypatch.setenv("APEX_SCREEN_OK", "1")
 
-    clock = [1_800_000_000.0]
+    clock = [time.time()]  # real "now", so files a test writes mid-run are newer than session start
     sleeps = []
 
     def fake_sleep(s):  # Ctrl-C is main's normal exit
@@ -315,13 +317,48 @@ def test_timer_voice_respects_mute(monkeypatch, tmp_path):
     assert seen["notify"] == ["Session done: 1 min focused."] and seen["say"] == []
 
 
-def test_stale_control_file_is_removed_at_start(monkeypatch, tmp_path):
+def test_stop_from_before_session_start_is_ignored_but_mute_and_pause_apply(monkeypatch, tmp_path):
+    # Written while the model was still loading in an older session: its stop is stale, its Mute is not.
     sd = tmp_path / "state"
     sd.mkdir()
     write_control(sd, stop=True, muted=True)
-    seen = run_main(monkeypatch, tmp_path, checks=2, mute=False, state_dir=sd)
-    assert len(seen["log"]) == 2 and not (sd / "control.json").exists()
-    assert seen["state"]["stop_reason"] is None and seen["state"]["muted"] is False
+    os.utime(sd / "control.json", (1_000_000, 1_000_000))
+    seen = run_main(monkeypatch, tmp_path, checks=2, mute=False, verdict=DISTRACTED, state_dir=sd)
+    assert len(seen["log"]) == 2 and (sd / "control.json").exists()
+    assert seen["state"]["stop_reason"] is None and seen["state"]["muted"] is True and seen["say"] == []
+
+
+def test_pause_clicked_before_session_start_still_applies(monkeypatch, tmp_path):
+    sd = tmp_path / "state"
+    sd.mkdir()
+    write_control(sd, paused_until=time.time() + 3600, stop=True)
+    os.utime(sd / "control.json", (1_000_000, 1_000_000))
+    seen = run_main(monkeypatch, tmp_path, checks=2, state_dir=sd)
+    assert seen["classify"] == [] and seen["state"]["stop_reason"] is None
+
+
+def test_sigterm_takes_the_graceful_exit(monkeypatch, tmp_path):
+    sd = tmp_path / "state"
+    term = lambda n: os.kill(os.getpid(), signal.SIGTERM)  # noqa: E731
+    before = signal.getsignal(signal.SIGTERM)
+    seen = run_main(monkeypatch, tmp_path, checks=5, state_dir=sd, on_sleep=term)
+    assert len(seen["log"]) == 1 and seen["events"][-1]["event"] == "session_end"
+    assert (seen["state"]["state"], seen["state"]["stop_reason"]) == ("stopped", None)
+    assert not Path(seen["screencapture"][0]).exists()  # temp frame cleaned up
+    assert signal.getsignal(signal.SIGTERM) is before  # handler restored for whoever called main()
+
+
+def test_failed_model_load_still_publishes_stopped(monkeypatch, tmp_path):
+    sd = tmp_path / "state"
+
+    def broken_load():
+        raise RuntimeError("model weights missing")
+
+    with pytest.raises(RuntimeError, match="weights missing"):
+        run_main(monkeypatch, tmp_path, checks=1, state_dir=sd, on_start=broken_load)
+    assert json.loads((sd / "state.json").read_text())["state"] == "stopped"
+    (log_path,) = (tmp_path / "logs").glob("session-*.jsonl")
+    assert json.loads(log_path.read_text().splitlines()[-1])["event"] == "session_end"
 
 
 def test_state_file_is_owner_only_and_complete(monkeypatch, tmp_path):
