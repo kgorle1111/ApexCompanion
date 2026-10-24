@@ -92,7 +92,9 @@ def test_on_screen_text_cannot_suppress_a_verdict(monkeypatch, tmp_path):
     cats = {"app": "YouTube", "content": "cat video, 3Blue1Brown in sidebar", "category": "entertainment"}
     cats |= {"state": "distracted", "latency_s": 0.1}
     url = "https://www.youtube.com/watch?v=cats"
-    seen = run_main(monkeypatch, tmp_path, checks=1, verdict=cats, front_app="Safari", url=url, sites="[ok]\n3blue1brown\n")
+    seen = run_main(
+        monkeypatch, tmp_path, checks=1, verdict=cats, front_app="Safari", url=url, sites="[ok]\n3blue1brown\n"
+    )
     assert (seen["log"][0]["state"], seen["log"][0]["rule"]) == ("distracted", None)
 
 
@@ -117,3 +119,25 @@ def test_rule_miss_still_asks_the_model(monkeypatch, tmp_path):
     seen = run_main(monkeypatch, tmp_path, checks=1, front_app="Safari", url=url, sites="[distracting]\nreddit\n")
     assert len(seen["classify"]) == 1 and seen["classify"][0][1]  # the frame existed while it was read
     assert not Path(seen["classify"][0][0]).exists()
+
+
+def test_log_keeps_host_only_and_content_only_on_roast(monkeypatch, tmp_path):
+    url = "https://mail.example.com/inbox/secret-thread?q=diagnosis"
+    seen = run_main(monkeypatch, tmp_path, checks=1, front_app="Safari", url=url)
+    raw = seen["log_path"].read_text()
+    rec = seen["log"][0]
+    assert rec["host"] == "mail.example.com" and "url" not in rec
+    assert "secret-thread" not in raw and "diagnosis" not in raw
+    assert rec["action"] is None and rec["content"] is None
+    assert "editing apex.py" not in raw
+
+
+def test_log_keeps_content_when_roasted(monkeypatch, tmp_path):
+    cats = {**WORKING, "content": "cat compilation", "category": "entertainment", "state": "distracted"}
+    seen = run_main(monkeypatch, tmp_path, checks=1, verdict=cats, front_app="Safari", url="https://example.com/")
+    assert (seen["log"][0]["action"], seen["log"][0]["content"]) == ("roast", "cat compilation")
+
+
+def test_log_file_is_owner_only(monkeypatch, tmp_path):
+    seen = run_main(monkeypatch, tmp_path, checks=1)
+    assert seen["log_path"].stat().st_mode & 0o777 == 0o600

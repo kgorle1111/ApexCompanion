@@ -166,7 +166,9 @@ def main() -> None:
     print(f"model ready in {time.perf_counter() - t0:.1f}s", flush=True)
 
     LOG_DIR.mkdir(exist_ok=True)
-    log = (LOG_DIR / f"session-{time.strftime('%Y%m%d-%H%M%S')}.jsonl").open("a")
+    log_path = LOG_DIR / f"session-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    # Owner-only from creation: even trimmed, the log says which apps and sites were in front and when.
+    log = os.fdopen(os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), "a")
     coach = Coach(args.streak, args.cooldown, args.praise_every)
     fd, shot = tempfile.mkstemp(prefix="apex_", suffix=".jpg")  # per-run: two instances can't clobber
     os.close(fd)
@@ -237,8 +239,10 @@ def main() -> None:
                     {
                         "t": time.time(),
                         "front_app": app_name,
-                        "url": url,
-                        **{k: v[k] for k in ("app", "content", "category", "state", "rule", "latency_s")},
+                        "host": rules.host(url),  # not the URL: paths and queries make the log a browsing diary
+                        "app": v["app"],
+                        "content": v["content"] if action == "roast" else None,  # only what was said out loud
+                        **{k: v[k] for k in ("category", "state", "rule", "latency_s")},
                         "action": action,
                         "line": line,
                     }
