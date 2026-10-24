@@ -160,6 +160,102 @@ Two original archetypes, not impressions of any real person or character, picked
 
 Each persona is a prompt, a few example lines, and a built-in macOS voice, in `personas.py`. Repeat offenses escalate: the second call-out in a session is sharper than the first, and from the third on it counts out loud. Praise is off by default (`--praise-every 0`), so a focused stretch stays quiet; `--praise-every N` brings it back after N working checks in a row. Roasts can also mention the goal you set ("you said you'd be working on…"). Every spoken line passes a word filter: if a line contains a slur or injected instructions, it's replaced with a fixed safe line.
 
+## Tech stack
+
+| Layer | What | Why this |
+|---|---|---|
+| Model | Gemma 4 E4B, 8-bit MLX build (`mlx-community/gemma-4-e4b-it-8bit`) | Native image input, fits in about 11 GB, sub-second vision check; the same weights write the roast |
+| Inference | MLX 0.32.4 + mlx-vlm 0.7.10 on the Apple GPU (Metal) | Fastest local path on Apple Silicon; no server, no network |
+| Coach | Python 3.12, standard library first: `subprocess`, `json`, `urllib.parse`, `tempfile`, `resource` | Small, auditable loop; every outside call is a subprocess with a timeout |
+| Screen and voice | macOS built-ins: `screencapture`, `sips`, `osascript` (notifications, browser tab address), `lsappinfo` (front app), `say` | Nothing to install; works offline |
+| App shell | Swift + AppKit host (`packaging/main.swift`), menu-bar status item, ad-hoc signed `.app` | A compiled host is what macOS grants Screen Recording to, and it stays alive as the coach's parent |
+| Installer | Bash launcher (`packaging/launcher.sh`) + uv, pinned dependencies (`packaging/constraints.txt`) | One-click first run: private Python, packages and model in Application Support |
+| Quality | pytest (stubbed model, about 1.7 s for the suite), ruff 0.14, `eval.py` on real web pages with false-roast and recall gates | Fast tests on every change; the real-model eval is the release gate |
+| CI | GitHub Actions: ruff on Ubuntu, tests on macOS 14 (Apple Silicon) | MLX only ships Apple Silicon wheels |
+| Site | One static HTML file, no JavaScript framework, no third-party requests; GitHub Pages from `gh-pages` | Loads with Wi-Fi off; nothing to break |
+
+## Architecture
+
+### Processes
+
+```mermaid
+flowchart LR
+    user([You]) -->|double-click| host
+    subgraph app["ApexCompanion.app"]
+        host["Swift host<br/>main.swift<br/>menu-bar item"]
+        launcher["launcher.sh<br/>first-run setup,<br/>persona, goal"]
+    end
+    host -->|spawns, stays parent| launcher
+    launcher -->|exec| coach["Python coach<br/>apex.py"]
+    coach -->|writes every check| state[("state.json")]
+    host -->|polls every 2 s| state
+    host -->|Pause / Mute / Stop| control[("control.json")]
+    coach -->|reloads on change| control
+    coach -->|appends| logs[("logs/session-*.jsonl")]
+    coach --> model["Gemma 4 E4B<br/>MLX on the GPU"]
+```
+
+macOS grants Screen Recording to the app that launched a process, and only while it runs. That is why the Swift host stays alive as the parent of the coach instead of handing off to a detached script. Everything the processes share is a file in `~/Library/Application Support/ApexCompanion/`, readable only by you.
+
+### One check
+
+```mermaid
+flowchart TD
+    tick([every 10 s]) --> ctl{"control.json:<br/>paused or stop?"}
+    ctl -->|stop| endS([end session, write summary])
+    ctl -->|paused| idle["no screenshot, no model"]
+    ctl -->|no| call{"call app or<br/>meeting tab in front?"}
+    call -->|yes| quiet["quiet: no screenshot"]
+    call -->|no| rule{"your site rules<br/>match app or tab address?"}
+    rule -->|yes| verdict
+    rule -->|no| shot["screencapture → sips 1024 px<br/>(temp file, deleted in finally)"]
+    shot --> vlm["Gemma 4 describes:<br/>app, content, category"]
+    vlm --> map["code maps category → working / distracted<br/>unparsed → working"]
+    map --> verdict["verdict"]
+    verdict --> coachS{"2 distracted in a row<br/>and 60 s cooldown?"}
+    coachS -->|no| log
+    coachS -->|yes| roast["Gemma 4 writes a roast<br/>(goal + what was on screen)"]
+    roast --> guard["word filter: slur or injected<br/>instruction → fixed safe line"]
+    guard --> speak["notification + say<br/>(say skipped when muted)"]
+    speak --> log["log event + state.json"]
+```
+
+### Trust boundaries
+
+| Input | Trusted? | How it's handled |
+|---|---|---|
+| Pixels on screen | No | The model only describes them; it never decides the verdict. Its text never reaches a shell or AppleScript as code: notifications pass it as an argument, `say` gets it after `--`. |
+| Model's description | No | Mapped to a verdict by a fixed table in code. Never used to match your site rules. Reaches the roast prompt capped at 120 characters. |
+| Model's roast | No | Cleaned to two sentences and checked by a word filter before it is shown or spoken. |
+| Front app name, tab address | Yes (from macOS) | The only inputs your site rules match. Logs keep the host, not the full address. |
+| Your goal and sites list | Yours | Goal is used in the roast only, never the classifier, so accuracy numbers don't move with it. |
+
+### Files on your Mac
+
+| Path | Written by | What |
+|---|---|---|
+| `app/`, `venv/`, `python/` | launcher | The coach code and its private Python |
+| `sites.txt`, `config` | you, launcher | Your lists, persona, last session length |
+| `state.json` | coach | Live state for the menu bar |
+| `control.json` | menu bar | Pause, mute, stop requests |
+| `logs/session-*.jsonl` | coach | One file per session, deleted after 7 days |
+| Model weights | launcher (once) | Hugging Face cache, about 8.3 GB |
+
+### Repo map
+
+| File | Role |
+|---|---|
+| `apex.py` | The loop: capture, rules, classify, coach, speak, log |
+| `gemma.py` | Loads Gemma 4 once; `classify()` and `generate_text()` |
+| `rules.py` | Your site lists, front app, tab address, Shorts rule, meeting detection |
+| `personas.py` | The two coaches, roast prompts, output cleaning and word filter |
+| `control.py` | `state.json` / `control.json` reading and atomic writes |
+| `report.py` | Session summary from the logs |
+| `eval.py` + `evals/` | Accuracy harness; labels and results (screenshots are not committed) |
+| `packaging/` | Swift host, launcher, build script, pinned dependencies |
+| `site/` | The landing page |
+| `tests/` | Unit and loop tests with a stubbed model |
+
 ## Design decision: the model never says "distracted"
 
 The first version asked Gemma one question: is this screenshot `working` or `distracted`? It labeled a YouTube cat compilation "working". Gemma 4 did it, and so did Gemma 3 when we tried it as a cross-check.
