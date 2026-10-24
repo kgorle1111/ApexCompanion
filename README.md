@@ -21,21 +21,25 @@ Demo video and landing page: https://kgorle1111.github.io/ApexCompanion/
 ## Download
 
 1. Download **ApexCompanion.zip** from [Releases](https://github.com/kgorle1111/ApexCompanion/releases/latest).
-2. Unzip it.
-3. Right-click the app and choose **Open** (the first time only; macOS asks because the app isn't from the App Store).
+2. Unzip it and drag **ApexCompanion** into Applications.
+3. Open it. macOS warns you because the app is not notarized: click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway** (first time only; on macOS 15 and later, right-click → Open no longer gets you past this).
 4. Pick your coach.
 
 Step-by-step install and permissions guide: [INSTALL.md](INSTALL.md).
 
-**Requirements:** Apple Silicon Mac (M1 or later), macOS 14 or newer, about 10 GB of free disk, 16 GB of RAM recommended (we measured 11.2 GB peak memory).
+**Requirements:** Apple Silicon Mac (M1 or later), macOS 14 or newer, 16 GB of RAM (8 GB Macs are not supported; we measured 11.2 GB peak memory), and about 12 GB of free disk (setup plus the 8.3 GB model; the launcher wants 10 GB still free after setup). First run needs internet: it downloads uv, Python with about 850 MB of packages, and the model. After that it makes no network calls.
+
+It has no window: it talks through notifications. Open the app again to stop it, switch coach, or edit your sites. It speaks out loud and names what's on your screen, so mute your Mac (or run from source with `--mute`) in shared spaces.
+
+Built for watching yourself: no accounts, no remote reporting. Install it only on your own Mac.
 
 Developers can also [run it from source](#run-from-source).
 
 ## What it does
 
-Every 10 seconds it takes a screenshot, asks Gemma 4 what's on it, and decides in code whether you're working. Two distracted checks in a row and your coach speaks up: a one- or two-line roast, in character, that names what you're actually looking at. While you work, it stays quiet.
+Every 10 seconds it checks what you're doing. If one of your site rules matches the frontmost app or the browser tab's URL, that decides. Otherwise Gemma 4 describes a screenshot and code decides whether you're working. Two distracted checks in a row and your coach speaks up: a one- or two-line roast, in character, that names what you're actually looking at. While you work, it stays quiet.
 
-Nothing leaves the machine. Pull the Wi-Fi and it keeps running.
+Nothing leaves the machine while it runs. Once setup is done, pull the Wi-Fi and it keeps running.
 
 > Think of it as a gym coach who can see your screen but has signed an NDA with your laptop.
 
@@ -49,9 +53,9 @@ So the model runs on the laptop: Gemma 4 E4B, 8-bit, through `mlx-vlm` on Apple 
 
 What stays on disk:
 - **Screenshots: nothing.** Each frame goes to one temp file, gets classified, and is deleted right after its check.
-- **Session log:** `logs/session-*.jsonl` keeps the model's short text description of each check (app, content, category, verdict), the frontmost app name, the browser tab URL when it could read one, which of your rules matched, and any line it spoke. Local only, git-ignored. Delete the folder whenever you like.
+- **Session log:** one local, text-only `session-*.jsonl` file per session, readable only by you (`chmod 600`). Each check records the category and verdict, the frontmost app name, the browser tab's host (not the full URL), which of your rules matched, and any line it spoke. The model's screen description is kept only for checks where a roast fired. Delete `~/Library/Application Support/ApexCompanion/logs` (app) or `./logs` (source) anytime.
 
-Side effects of running locally: it's free, and it works on a plane.
+Side effects of running locally: it's free, and after setup it works on a plane.
 
 ## How it works
 
@@ -76,6 +80,8 @@ Side effects of running locally: it's free, and it works on a plane.
  Ctrl-C ──▶ session stats: length, checks, % focused, call-outs
 ```
 
+Before the vision call, your site rules check the frontmost app and the active tab's URL. On a rule hit, the vision model is skipped for that check (see [Your sites, your rules](#your-sites-your-rules)).
+
 One model load, reused for both the vision call and the roast. The same Gemma 4 weights do both jobs.
 
 Category map (lives in code, not in the prompt):
@@ -98,26 +104,29 @@ The model's guess is a default, not the last word. You keep a plain-text list, `
 reddit
 steam
 [ok]
-3blue1brown
+github
 figma
 ```
 
-- One site, app, or channel per line. Not case-sensitive, whole-word match, `#` starts a comment.
+- One site or app per line. Not case-sensitive, whole-word match, `#` starts a comment.
 - **"ok" always wins.** If something matches both sections, it counts as working.
 - Edits apply on the next check. No restart.
-- What it matches against: the frontmost app's name, and for Safari, Chrome, Arc, Brave, and Edge, the actual URL of the active tab (macOS asks once to allow ApexCompanion to control your browser). It also matches against what Gemma read on screen, which is the only signal for Firefox and for browsers that can't be asked.
+- What it matches against: only the frontmost app's name and, for Safari, Chrome, Arc, Brave, and Edge, the URL of the active tab (macOS asks once to let ApexCompanion control your browser; it reads only the tab's address, locally). In Firefox and other browsers, only the app name. It never matches on-screen text, so a page can't trip or dodge a rule by what it displays.
+- That means rules work by domain or app, not by YouTube channel: allow a site or an app, not one channel on it.
+- Built in: `youtube.com/shorts` always counts as distracting. Your `[ok]` list still wins.
+- On a rule hit, the vision model is skipped for that check.
 - A rule changes the verdict, not the timing: it still takes 2 distracted checks in a row before a roast.
 
 The design point: your list is deterministic and overrides the model both ways, so a wrong guess about your own sites is something you fix in one line, not something you argue with.
 
 ### Personas
 
-Two original characters, picked with `--persona`:
+Two original archetypes, not impressions of any real person or character, picked with `--persona`:
 
 - **The Closer** (`--persona closer`): an arrogant, razor-witty dealmaker who treats you like the associate about to blow the deal.
 - **The Whip** (`--persona whip`): a cold, slow-talking political operator who speaks in unsettling metaphors.
 
-Each persona is a prompt, a few example lines, and a built-in macOS voice, in `personas.py`. Repeat offenses escalate: the second call-out in a session is sharper than the first, and from the third on it counts out loud. Stay on task long enough (30 working checks in a row by default) and you get a rare line of praise.
+Each persona is a prompt, a few example lines, and a built-in macOS voice, in `personas.py`. Repeat offenses escalate: the second call-out in a session is sharper than the first, and from the third on it counts out loud. Stay on task long enough (30 working checks in a row by default) and you get a rare line of praise. Every spoken line passes a word filter: if a line contains a slur or injected instructions, it's replaced with a fixed safe line.
 
 ## Design decision: the model never says "distracted"
 
@@ -130,16 +139,16 @@ A binary label gives the model room to rationalize ("maybe they're researching c
 
 With describe-then-categorize, the same cat video landed in a distracted category, so the code called it distracted.
 
-That fix started as **one synthetic test case**. The real-page eval came after: across 51 real public web pages in two batches, the classifier got **40/41 clear-cut pages right, with 0 false roasts** (details under [Evaluating it](#evaluating-it)).
+That fix started as **one synthetic test case**. The real-page eval came after: on a blind batch of 23 real public web pages captured after tuning, the classifier got **15/16 clear-cut pages right** (Wilson 95% interval about 72% to 99%), with **0 false roasts on clear-cut pages** (details under [Evaluating it](#evaluating-it)).
 
-It's the pattern we default to: deterministic guards around one structured model call, and code owns the final decision. The debounce, cooldown, and fail-open default are plain Python (`Coach` in `apex.py`, no I/O) with unit tests in `tests/`. Your site list (`rules.py`) sits on top of the model the same way: plain code, applied after the model call.
+It's the pattern we default to: deterministic guards around one structured model call, and code owns the final decision. The debounce, cooldown, and fail-open default are plain Python (`Coach` in `apex.py`, no I/O) with unit tests in `tests/`. Your site list (`rules.py`) works the same way: plain code, checked before the model call, which it skips on a hit.
 
 ## Prior art (and what's different)
 
 We're not the first to point a local model at a screen to catch drift. [AccountyCat](https://github.com/strjonas/AccountyCat) is an MIT macOS focus companion running local Qwen via llama.cpp; it reads the app and window title first and uses a screenshot only when that's ambiguous, then nudges you. [Observer AI](https://github.com/Roy3838/Observer) lets you build local screen-watching agents, including "when I'm distracted, call me". Dayflow keeps a local screenshot timeline without intervening.
 
 What ApexCompanion does differently:
-- **Gemma 4 vision on every check**, not window-title text with a screenshot fallback.
+- **Gemma 4 vision on every check your own rules don't already decide**, not window-title text with a screenshot fallback.
 - **Spoken persona roasts** that name what's on screen, instead of a quiet nudge.
 - **Code owns the verdict.** The model describes; a lookup table decides.
 
@@ -178,55 +187,57 @@ Measured on an M3 Max, `mlx-community/gemma-4-e4b-it-8bit`, `mlx-vlm 0.7.10`, of
 
 | What | Number | Caveat |
 |---|---|---|
-| Model load | **3.7 s** | |
+| Model load | **3.4 to 3.7 s** | |
 | First classify call | **2.6 s** | includes warm-up |
-| Warm classify, per check | **p50 0.87 s, p95 0.96 s** (batch 1); **p50 0.78 s, p95 0.94 s** (batch 2) | over the real eval pages, model already loaded |
-| Roast generation | **~2.0 s** | |
+| Vision classify call only, warm | **p50 0.87 s, p95 0.96 s** (batch 1); **p50 0.78 s, p95 0.94 s** (batch 2) | model already loaded; excludes `screencapture` and resize |
+| Roast generation | **0.57 to 0.79 s** | |
 | Peak memory | **11.2 GB** | CLI cold run |
 | End-to-end check | 2 distracted checks → spoken roast | worked once, on a synthetic image |
-| Classifier, clear-cut real web pages, both batches | **40/41 correct, 0 false roasts** | 51 public pages in total; batch-2 labels are provisional |
-| Batch 1 (28 pages, used while tuning) | **25/25** clear-cut, **26/28** overall | both misses were on cases labeled ambiguous |
-| Batch 2 (23 pages, blind, never tuned on) | **15/16** clear-cut, **21/23** overall | captured after prompt tuning finished |
-| Distracted recall, clear-cut | **17/18** | 11/11 in batch 1, 6/7 in batch 2 |
-| Real-world time from opening a distraction to the roast | not measured yet | by design at least 2 checks at a 10 s interval, plus ~2.0 s to write the roast |
+| **Batch 2, blind** (23 pages, never tuned on) | **15/16** clear-cut (Wilson 95% interval about 72% to 99%), **21/23** overall, 0 false roasts on clear-cut pages | the headline; captured after prompt tuning finished; labels not reviewed by a person |
+| Batch 2 distracted recall, clear-cut | **6/7** | exactly at the 0.85 gate |
+| Batch 1, tuning set (28 pages, used while tuning) | **25/25** clear-cut, **26/28** overall | not a fair test on its own |
+| Both batches pooled | **40/41** clear-cut across 51 pages (95% interval lower bound about 87%); distracted recall **17/18** | secondary; one false roast, on a page labeled ambiguous |
+| Real-world time from opening a distraction to the roast | not measured yet | by design at least 2 checks at a 10 s interval, plus 0.6 to 0.8 s to write the roast |
 | Battery drain per hour | not measured yet | |
 
 Fixed settings (configuration, not measurements): 10 s check interval, 2 consecutive distracted checks before a roast, 60 s cooldown between roasts, screenshots downscaled to 1024 px on the long side.
 
 ## Evaluating it
 
-`eval.py` runs the classifier over real screenshots in `evals/` against hand labels in `evals/labels.json` and prints accuracy and per-case latency. The screenshot files are git-ignored: they're pictures of someone's real screen, so they stay on that machine.
+`eval.py` runs the classifier over real screenshots in `evals/` against hand labels (`evals/labels.json`, `evals/labels2.json`) and prints accuracy and per-case latency. The repo has the labels and results (`evals/results*.json`), but not the screenshots: they're captures of third-party pages, so they're git-ignored. That means you can't rerun the eval from the repo alone.
 
 Pages a reasonable person could call either way are labeled ambiguous and reported separately. All runs: Gemma 4 E4B 8-bit, `mlx-vlm 0.7.10`, M3 Max, offline.
 
-**Batch 1: 28 pages, used while tuning the prompt.** Real public web pages captured in a headless browser: 12 working, 11 distracted, 5 hard cases. A person confirmed every label.
-- Clear-cut pages: **25/25**, with **0 false roasts**.
-- All 28 pages: **26/28**. Both misses were ambiguous cases: a lofi "study" stream whose player showed "Video unavailable", and a random Wikipedia biography.
-- Distracted recall: **11/11**.
-- Held-out within batch 1: **6/6**. One of those (ESPN) was looked at while tuning the prompt, so 5 are clean.
-- Latency: p50 0.87 s, p95 0.96 s per check, warm.
-
-**Batch 2: 23 more pages, blind.** Captured after prompt tuning had finished, and never used to tune anything. The labels are provisional: they have not been reviewed by a person yet.
-- Clear-cut pages: **15/16**, with **0 false roasts**.
+**Batch 2 (the headline): 23 pages, blind.** Captured after prompt tuning had finished, and never used to tune anything. The labels are provisional: they have not been reviewed by a person yet.
+- Clear-cut pages: **15/16** (Wilson 95% interval about 72% to 99%), with **0 false roasts on clear-cut pages**.
 - All 23 pages: **21/23**.
-- Misses: a YouTube Shorts basketball clip filed as `educational_video` (a clear-cut distraction it let through), and a celebrity-gossip page filed as `news_reading` (labeled ambiguous). Both failed open to working.
-- Latency: p50 0.78 s, p95 0.94 s per check, warm.
+- Distracted recall: **6/7**, exactly at the 0.85 gate.
+- Misses: a YouTube Shorts basketball clip filed as `educational_video` (a clear-cut distraction it let through), and a celebrity-gossip page (Page Six) filed as `news_reading` (labeled ambiguous). Both failed open to working.
+- Vision classify latency: p50 0.78 s, p95 0.94 s, warm.
 
-**Combined:** 40/41 clear-cut across 51 real pages, 0 false roasts. That is a small set, not a general accuracy figure, and we don't claim 100%.
+**Batch 1 (the tuning set): 28 pages, used while tuning the prompt.** Real public web pages captured in a headless browser: 12 working, 11 distracted, 5 hard cases. The author confirmed every label. Because we tuned on it, it's not a fair test on its own.
+- Clear-cut pages: **25/25**.
+- All 28 pages: **26/28**. Both misses were ambiguous cases: a lofi "study" stream whose player showed "Video unavailable", and a random Wikipedia biography. The lofi stream was called distracted: that is the one false roast in the eval, on a page labeled ambiguous.
+- Distracted recall: **11/11**.
+- Vision classify latency: p50 0.87 s, p95 0.96 s, warm.
 
-**Checking that the eval can fail.** We broke the category map on purpose and re-ran it (mutation testing). Moving `entertainment_video` into the working list turned the eval red on the distracted-recall gate (threshold 0.85). Moving `coding` into the distracted list turned it red with 5 false roasts. The first version of the gate checked accuracy only, and it did not catch the first mutation, so we added the recall gate.
+**Pooled:** 40/41 clear-cut across 51 real pages (95% interval lower bound about 87%). That is a small set, not a general accuracy figure.
+
+**Checking that the eval can fail.** We broke the category map on purpose and re-ran it (mutation testing). Moving `entertainment_video` into the working list turned the eval red on the distracted-recall gate (threshold 0.85). Moving `coding` into the distracted list turned it red with 6 false roasts. The first version of the gate checked accuracy only, and it did not catch the first mutation, so we added the recall gate.
 
 ## Limitations
 
-- **Web pages only.** The eval is 51 real web pages. Native desktop apps (VS Code, the terminal, the native Spotify app, games) are untested. Your site list can cover a native app by name.
-- **"Other" fails open.** Anything the model files under "other" counts as working, so a native game that lands there won't be roasted.
-- **Small eval.** 41 clear-cut cases is a small set; one miss is about 2.5 points. Batch-2 labels are still provisional. Short-form video (YouTube Shorts) is a known weak spot: the blind batch's one clear-cut miss was a Shorts clip.
+- **Web pages only.** The eval is 51 real web pages captured in a headless browser. No native-app frames (VS Code, the terminal, the native Spotify app, games) and no real desktop frames were tested. Your site list can cover a native app by name.
+- **Fail-open categories hide misses.** Anything filed under "other", or misfiled into a working category, counts as working and is never roasted. In the blind batch, a Shorts clip went to `educational_video` and a Page Six gossip page to `news_reading`. The built-in Shorts rule now covers the first case in supported browsers.
+- **Small eval, one labeler.** 16 blind clear-cut cases is a small set; one miss is about 6 points. The labeler is the author, and batch-2 labels have not been reviewed by a person.
+- **Not reproducible from the repo.** Labels and results are committed; the screenshots are not (third-party pages).
 - **Heavy for a background app.** 11.2 GB peak memory, and a vision call every 10 seconds. Expect trouble on Macs with little unified memory, and expect it to cost more battery than a text-first approach.
 - **Mac only.** `screencapture`, `sips`, `osascript`, `say`, and MLX are all macOS / Apple Silicon.
 - **It sees one screen, once every 10 seconds.** It can miss short distractions, and on multiple displays it only judges what `screencapture` captures.
 - **Context is a single frame.** A lecture on YouTube with a cat thumbnail in the sidebar, or gameplay footage you're watching for work, can be misread. Fail-open defaults and the 2-check debounce reduce false roasts; they don't eliminate them.
-- **The session log is a record of what you looked at.** Text only and local, but it includes app names and tab URLs. Delete `logs/` if you don't want it.
-- **Rules are word matches.** A rule like `news` matches any page whose app, URL, or description contains that word. Keep entries specific.
+- **The session log is a record of what you looked at.** Text only, local, readable only by you, but it includes app names and site hosts. Delete the logs folder if you don't want it.
+- **Spoken roasts name what's on screen.** Anyone nearby hears it. Use `--mute` (or mute your Mac) in shared spaces.
+- **Rules are word matches.** A rule like `news` matches any app name or tab URL containing that word. Keep entries specific.
 - **It's a nudge, not a blocker.** It won't stop you from opening anything. That's deliberate, but it means it only works if you leave it running.
 - **No automatic fallback.** The Ollama build of Gemma 4 we had takes no image input, which is why vision runs through `mlx-vlm`. Gemma 3 vision via Ollama worked in a quick test, but that path isn't wired into `apex.py`.
 
