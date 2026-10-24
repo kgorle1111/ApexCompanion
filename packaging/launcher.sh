@@ -276,6 +276,7 @@ run_coach() {
     # (macOS /bin/bash is 3.2: no $BASHPID, so a tiny sh records its own $$ and execs python.)
     (
         cd "$WORK" || exit 1
+        umask 077  # apex.log and the session logs are readable by this user only
         [ -n "${MODEL_HF_HOME:-}" ] && export HF_HOME="$MODEL_HF_HOME"
         # APEX_SCREEN_OK: this app already passed the CoreGraphics preflight; skip apex.py's swift check,
         # which would prompt to install developer tools on Macs without them.
