@@ -287,3 +287,79 @@ def test_once_exits_nonzero_on_an_unparsed_answer(monkeypatch, tmp_path):
 def test_once_exits_zero_on_a_good_check(monkeypatch, tmp_path):
     seen = run_main(monkeypatch, tmp_path, checks=5, args=["--once"])
     assert seen["exit"] is None and len(seen["log"]) == 1
+
+
+# ---- Screen Recording preflight
+
+
+def test_preflight_asks_coregraphics_directly():
+    assert apex.screen_permission() in (True, False)  # a real answer, never "couldn't ask", on any Mac
+
+
+def test_preflight_needs_no_developer_tools(monkeypatch):
+    def no_subprocess(*a, **kw):
+        raise AssertionError("preflight shelled out (swift needs Xcode tools and failed open without them)")
+
+    monkeypatch.delenv("APEX_SCREEN_OK", raising=False)
+    monkeypatch.setattr(apex.subprocess, "run", no_subprocess)
+    monkeypatch.setattr(apex, "screen_permission", lambda: True)
+    apex.require_screen_permission()
+
+
+def test_missing_permission_refuses_to_start(monkeypatch):
+    monkeypatch.delenv("APEX_SCREEN_OK", raising=False)
+    monkeypatch.setattr(apex, "screen_permission", lambda: False)
+    with pytest.raises(SystemExit, match="Screen Recording permission is missing"):
+        apex.require_screen_permission()
+
+
+def test_unloadable_coregraphics_warns_instead_of_bricking(monkeypatch, capsys):
+    monkeypatch.delenv("APEX_SCREEN_OK", raising=False)
+    monkeypatch.setattr(apex, "CORE_GRAPHICS", "/nonexistent/CoreGraphics")
+    assert apex.screen_permission() is None
+    apex.require_screen_permission()
+    assert "couldn't verify Screen Recording permission" in capsys.readouterr().err
+
+
+def test_app_bundle_skips_the_startup_check(monkeypatch):
+    monkeypatch.setenv("APEX_SCREEN_OK", "1")
+    monkeypatch.setattr(apex, "screen_permission", lambda: False)
+    apex.require_screen_permission()
+
+
+def scripted_permission(*answers):
+    answers = list(answers)
+    return lambda: answers.pop(0) if len(answers) > 1 else answers[0]
+
+
+def test_permission_revoked_mid_session_stops_the_coach(monkeypatch, tmp_path):
+    sd = tmp_path / "state"
+    seen = run_main(monkeypatch, tmp_path, checks=100, state_dir=sd, permission=scripted_permission(True, False))
+    assert seen["exit"] == 3
+    checks = [e for e in seen["log"] if e["event"] == "check"]
+    assert len(checks) == apex.PERMISSION_EVERY - 1  # check 30 re-checked and stopped before capturing
+    assert seen["state"]["state"] == "error" and "permission was turned off" in seen["state"]["last_line"]
+    assert len(seen["state"]["last_line"]) <= 120
+
+
+def test_recheck_passes_while_permission_holds(monkeypatch, tmp_path):
+    calls = []
+    seen = run_main(monkeypatch, tmp_path, checks=61, permission=lambda: calls.append(1) or True)
+    assert seen["exit"] is None and len(calls) == 1 + 61 // apex.PERMISSION_EVERY  # baseline + one per 30
+
+
+def test_recheck_ignored_when_this_process_never_saw_the_grant(monkeypatch, tmp_path):
+    # Packaged app: the bundle owns the grant and checked it; this process may read False all along.
+    seen = run_main(monkeypatch, tmp_path, checks=61, permission=lambda: False)
+    assert seen["exit"] is None and len(seen["log"]) == 61
+
+
+def test_replay_mode_never_rechecks(monkeypatch, tmp_path):
+    img = tmp_path / "frame.jpg"
+    img.write_bytes(b"\xff\xd8 frame")
+
+    def no_check():
+        raise AssertionError("replay mode needs no Screen Recording")
+
+    seen = run_main(monkeypatch, tmp_path, checks=40, args=["--image", str(img)] * 40, permission=no_check)
+    assert seen["exit"] is None and len(seen["classify"]) == 40

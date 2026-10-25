@@ -35,6 +35,7 @@ def run_main(
     on_start=None,
     on_sleep=None,
     verdicts=(),
+    permission=lambda: True,
     hang_say=False,
 ):
     """Run main() for `checks` sleeps (one per check or paused tick). `shots` scripts screencapture: True writes a
@@ -42,7 +43,8 @@ def run_main(
     `on_start` runs once the model is loaded (after stale control files are cleared); `on_sleep(n)` before sleep n.
     `hang_say` makes say ignore everything but a kill.
     SystemExit is caught into seen["exit"]; tempfile.tempdir is per-test, so the lock and sweep never touch TMPDIR.
-    `verdicts` scripts classify (an Exception is raised) before falling back to `verdict`; so does a list `url`."""
+    `verdicts` scripts classify (an Exception is raised) before falling back to `verdict`; so does a list `url`.
+    `permission` stands in for the CoreGraphics preflight."""
     seen = {"screencapture": [], "classify": [], "roast_prompt": [], "notify": [], "say": [], "killed": []}
     shots, verdicts = list(shots), list(verdicts)
     urls = list(url) if isinstance(url, list) else None
@@ -95,6 +97,7 @@ def run_main(
     monkeypatch.setattr(rules, "front_url", lambda app: (urls.pop(0) if len(urls) > 1 else urls[0]) if urls else url)
     monkeypatch.setattr(rules, "in_meeting", lambda app, u: meeting)
     monkeypatch.setenv("APEX_SCREEN_OK", "1")
+    monkeypatch.setattr(apex, "screen_permission", permission)
     tmp = tmp_path / "tmp"
     tmp.mkdir(exist_ok=True)
     monkeypatch.setattr(apex.tempfile, "tempdir", str(tmp))

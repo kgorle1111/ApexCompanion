@@ -1,6 +1,7 @@
 """ApexCompanion: on-device focus coach. Gemma 4 watches the screen; a persona calls you out loud."""
 
 import argparse
+import ctypes
 import fcntl
 import json
 import os
@@ -25,6 +26,8 @@ SHOT_TIMEOUT_S = 15  # screencapture and sips each; a hung one must cost one che
 NOTIFY_TIMEOUT_S = 10
 SAY_TIMEOUT_S = 30  # longer than any persona line takes to speak
 BREAKER = 6  # consecutive failed or unparsed checks before the coach stops instead of faking focus
+PERMISSION_EVERY = 30  # checks between Screen Recording re-checks; revoked mid-session = wallpaper = "working"
+CORE_GRAPHICS = "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
 
 
 class EventLog:
@@ -132,25 +135,29 @@ def sweep_frames() -> int:
     return removed
 
 
+def screen_permission() -> bool | None:
+    """CoreGraphics' own answer, no developer tools needed. None if it can't be asked."""
+    try:
+        preflight = ctypes.CDLL(CORE_GRAPHICS).CGPreflightScreenCaptureAccess
+    except (OSError, AttributeError):
+        return None
+    preflight.restype, preflight.argtypes = ctypes.c_bool, []
+    return bool(preflight())
+
+
 def require_screen_permission() -> None:
     """Without permission screencapture still succeeds but returns only the wallpaper, so the coach
     would silently call everything 'working'. Refuse to start instead."""
     if os.environ.get("APEX_SCREEN_OK") == "1":  # the app bundle already checked via CoreGraphics
         return
-    try:
-        r = subprocess.run(
-            ["swift", "-e", "import CoreGraphics; print(CGPreflightScreenCaptureAccess())"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    ok = screen_permission()
+    if ok is None:  # warn, don't brick: a missing framework symbol isn't proof the permission is missing
         print(
-            "warning: couldn't verify Screen Recording permission (no swift); if every check says 'other', grant it.",
+            "warning: couldn't verify Screen Recording permission; if every check says 'other', grant it.",
             file=sys.stderr,
         )
         return
-    if r.stdout.strip() == "false":
+    if not ok:
         sys.exit(
             "Screen Recording permission is missing for this terminal app: screenshots would be "
             "wallpaper only.\nGrant it in System Settings → Privacy & Security → Screen Recording, "
@@ -266,11 +273,14 @@ def main() -> None:
     voice = Voice(p["voice"], p["rate"], args.mute)
     goal = control.clean_goal(args.goal)
 
-    lock_fd, swept = None, 0
+    lock_fd, swept, screen_ok = None, 0, None
     if not args.image:
         lock_fd = take_lock()
         swept = sweep_frames()
         require_screen_permission()
+        # Baseline for the mid-session re-check: if this process can't see the grant even at start (the packaged
+        # app checks via its own bundle), a False later says nothing about revocation.
+        screen_ok = screen_permission()
 
     LOG_DIR.mkdir(exist_ok=True)
     pruned = prune_logs(LOG_DIR, args.log_days) if args.log_days > 0 else 0
@@ -393,6 +403,12 @@ def main() -> None:
                     time.sleep(args.interval)
                     continue
             n += 1
+            if screen_ok and n % PERMISSION_EVERY == 0 and screen_permission() is False:
+                trip(
+                    "Screen Recording permission was turned off. Turn it back on, then open ApexCompanion again.",
+                    "screen recording permission revoked",
+                )
+                break
             timing: dict[str, float] = {}
             stage = "rules"
             try:
