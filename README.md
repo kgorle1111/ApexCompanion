@@ -261,7 +261,7 @@ flowchart TD
 
 ## Design decision: the model never says "distracted"
 
-The first version asked Gemma one question: is this screenshot `working` or `distracted`? It labeled a YouTube cat compilation "working". Gemma 4 did it, and so did Gemma 3 when we tried it as a cross-check.
+The first version asked Gemma one question: is this screenshot `working` or `distracted`? It labeled a YouTube cat compilation (a synthetic test image) "working". Gemma 4 did it, and so did Gemma 3 when we tried it as a cross-check.
 
 A binary label gives the model room to rationalize ("maybe they're researching cats"). So we split the job:
 
@@ -271,6 +271,17 @@ A binary label gives the model room to rationalize ("maybe they're researching c
 With describe-then-categorize, the same cat video landed in a distracted category, so the code called it distracted.
 
 That fix started as **one synthetic test case**. The real-page eval came after: on a blind batch of 23 real public web pages captured after tuning, the classifier got **15/16 clear-cut pages right** (Wilson 95% interval about 72% to 99%), with **0 false roasts on clear-cut pages** (details under [Evaluating it](#evaluating-it)).
+
+**Measured A/B.** We later re-ran a yes/no prompt against the shipped pipeline on the same 41 clear-cut real pages (same model, temperature 0; `evals/binary_baseline.py`, results in `evals/results_binary_baseline.json`):
+
+| Clear-cut pages | Yes/no prompt | Shipped (describe, then code decides) |
+|---|---|---|
+| Correct, both batches | 27/41 | 40/41 |
+| Distractions caught | 5/18 | 17/18 |
+| False roasts | 1 (a CNN page with a pop-up) | 0 |
+| **Correct, blind batch only** | **11/16** | **15/16** |
+
+Several yes/no misses described the screen correctly and still said working: a Minecraft video came back "working" with the reason "Minecraft gameplay video on screen". Others just echoed the rubric ("Coding, docs, notes, and educational videos") on a Reddit or Imgur page. Caveats: the shipped prompt was tuned on batch 1, so the blind-batch row is the fair comparison. The yes/no prompt's rubric names only entertainment and social media, so some misses (Amazon, Etsy, Steam, ESPN) may come from the rubric's wording, not from the yes/no format alone.
 
 It's the pattern we default to: deterministic guards around one structured model call, and code owns the final decision. The debounce, cooldown, and fail-open default are plain Python (`Coach` in `apex.py`, no I/O) with unit tests in `tests/`. Your site list (`rules.py`) works the same way: plain code, checked before the model call, which it skips on a hit.
 
