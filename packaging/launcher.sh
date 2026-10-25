@@ -209,13 +209,20 @@ ensure_venv() {
     if [ -x "$PY" ] && [ "$(cat "$VENV/.apex-ok" 2>/dev/null)" = "$DEPS_STAMP" ]; then log "venv ok"; return 0; fi
     [ "$(free_gb)" -ge 2 ] || fail "Not enough free disk space for setup (need about 2 GB free; you have $(free_gb) GB)."
     notify "Setting up (one time, a few minutes)…"
-    log "creating venv at $VENV"
-    case "$VENV" in "$APEX_HOME"/venv) rm -rf "$VENV" ;; esac
-    "$UV" venv --python 3.12 "$VENV" >&3 2>&1 || fail "Setup failed while creating the Python engine. Check your internet connection and open ApexCompanion again."
-    "$UV" pip install --python "$PY" -c "$HERE/constraints.txt" "mlx-vlm==0.7.10" pillow >&3 2>&1 \
-        || fail "Setup failed while installing the coach's engine. Check your internet connection and open ApexCompanion again."
-    "$PY" -c "import mlx_vlm, PIL, huggingface_hub" >&3 2>&1 || fail "Setup finished but the engine doesn't load."
-    echo "$DEPS_STAMP" > "$VENV/.apex-ok"
+    # Build beside the old venv and swap only once the new one imports: a dropped connection mid-install
+    # must not leave the user with no engine. --relocatable: entry-point shebangs and activate survive the mv.
+    local new="$VENV.new" old="$VENV.old"
+    log "creating venv at $new"
+    rm -rf "$new" "$old"   # leftovers of an interrupted setup
+    "$UV" venv --relocatable --python 3.12 "$new" >&3 2>&1 \
+        || venv_fail "Setup failed while creating the Python engine. Check your internet connection and open ApexCompanion again."
+    "$UV" pip install --python "$new/bin/python" -c "$HERE/constraints.txt" "mlx-vlm==0.7.10" pillow >&3 2>&1 \
+        || venv_fail "Setup failed while installing the coach's engine. Check your internet connection and open ApexCompanion again."
+    "$new/bin/python" -c "import mlx_vlm, PIL, huggingface_hub" >&3 2>&1 || venv_fail "Setup finished but the engine doesn't load."
+    echo "$DEPS_STAMP" > "$new/.apex-ok" || venv_fail "Couldn't write to $APEX_HOME."
+    if [ -e "$VENV" ]; then mv "$VENV" "$old" || venv_fail "Couldn't replace the old Python engine in $APEX_HOME."; fi
+    mv "$new" "$VENV" || { [ -e "$old" ] && mv "$old" "$VENV"; venv_fail "Couldn't move the new Python engine into place in $APEX_HOME."; }
+    rm -rf "$old"
     "$UV" cache clean >&3 2>&1 || true   # ~850 MB of downloaded wheels; the venv doesn't need them
     log "venv ready: $("$PY" -c 'import mlx_vlm,sys;print("mlx-vlm",mlx_vlm.__version__,"python",sys.version.split()[0])')"
 }
