@@ -35,6 +35,7 @@ def run_main(
     on_start=None,
     on_sleep=None,
     verdicts=(),
+    warm=WORKING,
     permission=lambda: True,
     hang_say=False,
 ):
@@ -44,7 +45,8 @@ def run_main(
     `hang_say` makes say ignore everything but a kill.
     SystemExit is caught into seen["exit"]; tempfile.tempdir is per-test, so the lock and sweep never touch TMPDIR.
     `verdicts` scripts classify (an Exception is raised) before falling back to `verdict`; so does a list `url`.
-    `permission` stands in for the CoreGraphics preflight."""
+    `permission` stands in for the CoreGraphics preflight.
+    `warm` is what the warm-up check returns."""
     seen = {"screencapture": [], "classify": [], "roast_prompt": [], "notify": [], "say": [], "killed": []}
     shots, verdicts = list(shots), list(verdicts)
     urls = list(url) if isinstance(url, list) else None
@@ -90,7 +92,7 @@ def run_main(
     monkeypatch.setitem(sys.modules, "gemma", fake_gemma)
     monkeypatch.setattr(apex.subprocess, "run", fake_run)
     monkeypatch.setattr(apex.subprocess, "Popen", FakeSay)
-    monkeypatch.setattr(apex, "warm_up", lambda g: None)
+    monkeypatch.setattr(apex, "warm_up", lambda g: dict(warm))
     monkeypatch.setattr(apex, "notify", lambda text, title: seen["notify"].append(text))
     monkeypatch.setattr(apex, "LOG_DIR", tmp_path / "logs")
     monkeypatch.setattr(rules, "front_app", lambda: front_app)

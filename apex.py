@@ -165,13 +165,15 @@ def require_screen_permission() -> None:
         )
 
 
-def warm_up(gemma) -> None:
+def warm_up(gemma) -> dict:
     from PIL import Image
 
     path = str(Path(tempfile.gettempdir()) / "apex_warmup.jpg")
     Image.new("RGB", (64, 64), "white").save(path)
-    gemma.classify(path)
-    Path(path).unlink(missing_ok=True)
+    try:
+        return gemma.classify(path)
+    finally:
+        Path(path).unlink(missing_ok=True)
 
 
 def capture(path: str) -> str:
@@ -373,7 +375,14 @@ def main() -> None:
         import gemma  # noqa: E402
 
         gemma.load_model()
-        warm_up(gemma)
+        warm = warm_up(gemma)
+        if warm["category"] == "unparsed":  # the coach would fail open to "working" on every check
+            print(
+                "WARNING: the model's warm-up answer didn't parse; checks may all read as 'working'.",
+                file=sys.stderr,
+                flush=True,
+            )
+            log.emit("warning", stage="warmup", raw=str(warm.get("raw", ""))[:200])
         load_s = time.perf_counter() - t0
         print(f"model ready in {load_s:.1f}s", flush=True)
         log.emit("model_ready", model=gemma.MODEL_ID, load_s=round(load_s, 2), rss_mb=peak_rss_mb())

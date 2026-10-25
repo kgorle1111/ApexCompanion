@@ -6,6 +6,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
+from pathlib import Path
 
 import pytest
 from test_loop import WORKING, run_main
@@ -363,3 +365,27 @@ def test_replay_mode_never_rechecks(monkeypatch, tmp_path):
 
     seen = run_main(monkeypatch, tmp_path, checks=40, args=["--image", str(img)] * 40, permission=no_check)
     assert seen["exit"] is None and len(seen["classify"]) == 40
+
+
+# ---- warm-up sanity
+
+
+def test_warm_up_returns_the_verdict_and_leaves_no_file(monkeypatch, tmp_path):
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    fake = types.SimpleNamespace(classify=lambda path: {"category": "unparsed", "exists": Path(path).exists()})
+    assert apex.warm_up(fake) == {"category": "unparsed", "exists": True}
+    assert not list(tmp_path.iterdir())
+
+
+def test_unparsed_warm_up_warns_loudly_but_runs(monkeypatch, tmp_path, capsys):
+    warm = {**UNPARSED, "raw": "x" * 500}
+    seen = run_main(monkeypatch, tmp_path, checks=2, warm=warm)
+    assert "warm-up answer didn't parse" in capsys.readouterr().err
+    (w,) = [e for e in seen["events"] if e["event"] == "warning"]
+    assert w["stage"] == "warmup" and w["raw"] == "x" * 200
+    assert seen["exit"] is None and len(seen["log"]) == 2
+
+
+def test_parsed_warm_up_is_quiet(monkeypatch, tmp_path):
+    seen = run_main(monkeypatch, tmp_path, checks=1)
+    assert not [e for e in seen["events"] if e["event"] == "warning"]
