@@ -20,6 +20,9 @@ LOG_DIR = Path(os.environ.get("APEX_LOG_DIR") or Path(__file__).parent / "logs")
 # The packaged app redirects stdout into a log file; the screen description only goes to a live terminal.
 INTERACTIVE = sys.stdout.isatty()
 SCHEMA = 1  # bump when event fields change; report.py reads it
+SHOT_TIMEOUT_S = 15  # screencapture and sips each; a hung one must cost one check, not the session
+NOTIFY_TIMEOUT_S = 10
+SAY_TIMEOUT_S = 30  # longer than any persona line takes to speak
 
 
 class EventLog:
@@ -140,7 +143,7 @@ def warm_up(gemma) -> None:
 
 
 def capture(path: str) -> str:
-    r = subprocess.run(["screencapture", "-x", "-t", "jpg", path], capture_output=True)
+    r = subprocess.run(["screencapture", "-x", "-t", "jpg", path], capture_output=True, timeout=SHOT_TIMEOUT_S)
     if r.returncode != 0 or not Path(path).exists() or Path(path).stat().st_size == 0:
         # Not sys.exit: SystemExit escapes the loop's `except Exception`, and a locked screen or sleeping
         # display fails capture transiently; that must skip one check, not end the session.
@@ -148,27 +151,31 @@ def capture(path: str) -> str:
             "screencapture failed. Grant Screen Recording to this terminal app "
             "(System Settings → Privacy & Security → Screen Recording), then restart it."
         )
-    subprocess.run(["sips", "-Z", str(SHOT_MAX_PX), path], capture_output=True, check=True)
+    subprocess.run(["sips", "-Z", str(SHOT_MAX_PX), path], capture_output=True, check=True, timeout=SHOT_TIMEOUT_S)
     return path
 
 
 def notify(text: str, title: str) -> None:
     # Model text goes in as argv, never spliced into AppleScript source.
-    subprocess.run(
-        [
-            "osascript",
-            "-e",
-            "on run argv",
-            "-e",
-            "display notification (item 1 of argv) with title (item 2 of argv)",
-            "-e",
-            "end run",
-            "--",
-            text,
-            title,
-        ],  # "--": a line starting with "-" would otherwise parse as an osascript flag
-        capture_output=True,
-    )
+    try:
+        subprocess.run(
+            [
+                "osascript",
+                "-e",
+                "on run argv",
+                "-e",
+                "display notification (item 1 of argv) with title (item 2 of argv)",
+                "-e",
+                "end run",
+                "--",
+                text,
+                title,
+            ],  # "--": a line starting with "-" would otherwise parse as an osascript flag
+            capture_output=True,
+            timeout=NOTIFY_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:  # a missed banner, never a dead session
+        print("output failed: notification timed out", file=sys.stderr, flush=True)
 
 
 class Voice:
@@ -180,8 +187,16 @@ class Voice:
         if self.mute:
             return
         if self.proc and self.proc.poll() is None:
-            self.proc.wait()  # never talk over itself
+            self.finish()  # never talk over itself
         self.proc = subprocess.Popen(["say", "-v", self.voice, "-r", str(self.rate), "--", text])
+
+    def finish(self) -> None:
+        if not self.proc:
+            return
+        try:
+            self.proc.wait(timeout=SAY_TIMEOUT_S)
+        except subprocess.TimeoutExpired:  # a wedged audio stack must not wedge the loop
+            self.proc.kill()
 
 
 def _graceful_term(signum, frame) -> None:
@@ -444,8 +459,7 @@ def main() -> None:
     finally:
         signal.signal(signal.SIGTERM, signal.SIG_IGN)  # a second TERM must not cut session_end short
         Path(shot).unlink(missing_ok=True)
-        if voice.proc:
-            voice.proc.wait()
+        voice.finish()
         checks = coach.working_checks + coach.distracted_checks
         focus_pct = 100 * coach.working_checks / checks if checks else 0
         log.emit(

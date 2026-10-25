@@ -34,11 +34,13 @@ def run_main(
     clock_step=0.0,
     on_start=None,
     on_sleep=None,
+    hang_say=False,
 ):
     """Run main() for `checks` sleeps (one per check or paused tick). `shots` scripts screencapture: True writes a
     frame, False fails. The wall clock is frozen except that each sleep advances it by `clock_step` seconds.
-    `on_start` runs once the model is loaded (after stale control files are cleared); `on_sleep(n)` before sleep n."""
-    seen = {"screencapture": [], "classify": [], "roast_prompt": [], "notify": [], "say": []}
+    `on_start` runs once the model is loaded (after stale control files are cleared); `on_sleep(n)` before sleep n.
+    `hang_say` makes say ignore everything but a kill."""
+    seen = {"screencapture": [], "classify": [], "roast_prompt": [], "notify": [], "say": [], "killed": []}
     shots = list(shots)
 
     def fake_run(cmd, **kw):
@@ -57,8 +59,15 @@ def run_main(
         def poll(self):
             return 0
 
-        def wait(self):
+        def wait(self, timeout=None):
+            if hang_say:
+                if timeout is None:
+                    raise AssertionError("waited on say with no timeout: a wedged say would hang forever")
+                raise subprocess.TimeoutExpired("say", timeout)
             return 0
+
+        def kill(self):
+            seen["killed"].append(True)
 
     def classify(path):
         seen["classify"].append((path, Path(path).exists()))
