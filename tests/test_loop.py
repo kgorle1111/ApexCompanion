@@ -34,15 +34,18 @@ def run_main(
     clock_step=0.0,
     on_start=None,
     on_sleep=None,
+    verdicts=(),
     hang_say=False,
 ):
     """Run main() for `checks` sleeps (one per check or paused tick). `shots` scripts screencapture: True writes a
     frame, False fails. The wall clock is frozen except that each sleep advances it by `clock_step` seconds.
     `on_start` runs once the model is loaded (after stale control files are cleared); `on_sleep(n)` before sleep n.
     `hang_say` makes say ignore everything but a kill.
-    SystemExit is caught into seen["exit"]; tempfile.tempdir is per-test, so the lock and sweep never touch TMPDIR."""
+    SystemExit is caught into seen["exit"]; tempfile.tempdir is per-test, so the lock and sweep never touch TMPDIR.
+    `verdicts` scripts classify (an Exception is raised) before falling back to `verdict`; so does a list `url`."""
     seen = {"screencapture": [], "classify": [], "roast_prompt": [], "notify": [], "say": [], "killed": []}
-    shots = list(shots)
+    shots, verdicts = list(shots), list(verdicts)
+    urls = list(url) if isinstance(url, list) else None
 
     def fake_run(cmd, **kw):
         if cmd[0] == "screencapture":
@@ -72,7 +75,10 @@ def run_main(
 
     def classify(path):
         seen["classify"].append((path, Path(path).exists()))
-        return dict(verdict)
+        v = verdicts.pop(0) if verdicts else verdict
+        if isinstance(v, Exception):
+            raise v
+        return dict(v)
 
     fake_gemma = types.ModuleType("gemma")
     fake_gemma.MODEL_ID = "fake-model"
@@ -86,7 +92,7 @@ def run_main(
     monkeypatch.setattr(apex, "notify", lambda text, title: seen["notify"].append(text))
     monkeypatch.setattr(apex, "LOG_DIR", tmp_path / "logs")
     monkeypatch.setattr(rules, "front_app", lambda: front_app)
-    monkeypatch.setattr(rules, "front_url", lambda app: url)
+    monkeypatch.setattr(rules, "front_url", lambda app: (urls.pop(0) if len(urls) > 1 else urls[0]) if urls else url)
     monkeypatch.setattr(rules, "in_meeting", lambda app, u: meeting)
     monkeypatch.setenv("APEX_SCREEN_OK", "1")
     tmp = tmp_path / "tmp"

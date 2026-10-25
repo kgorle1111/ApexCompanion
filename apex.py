@@ -24,6 +24,7 @@ SCHEMA = 1  # bump when event fields change; report.py reads it
 SHOT_TIMEOUT_S = 15  # screencapture and sips each; a hung one must cost one check, not the session
 NOTIFY_TIMEOUT_S = 10
 SAY_TIMEOUT_S = 30  # longer than any persona line takes to speak
+BREAKER = 6  # consecutive failed or unparsed checks before the coach stops instead of faking focus
 
 
 class EventLog:
@@ -281,7 +282,7 @@ def main() -> None:
     started = last_mark = focused_s = 0.0
     ends_at: float | None = None
     last_state, last_line, stop_reason = "starting", None, None
-    errors = roasts = praises = guarded = 0
+    errors = roasts = praises = guarded = bad_run = 0
 
     def publish(state: str) -> None:
         nonlocal last_state
@@ -312,6 +313,19 @@ def main() -> None:
             )
         except OSError as e:  # the menu bar goes stale, but the session itself is fine
             print(f"state write failed: {e!r}", file=sys.stderr, flush=True)
+
+    def trip(cause: str, error: str) -> None:
+        """Alive-but-broken must not sound like focus: stop loudly instead of logging 'working' forever.
+        `cause` is shown after "Stopped: " by the menu bar and launcher: one line, no prefix, under 120 chars."""
+        nonlocal stop_reason, last_line
+        stop_reason, last_line = "error", cause
+        print(f"stopped: {cause}", file=sys.stderr, flush=True)
+        log.emit("error", n=n, stage="breaker", error=error[:300])
+        try:
+            notify(cause, title)
+        except OSError as e:
+            print(f"output failed: {e!r}", file=sys.stderr, flush=True)
+        publish("error")
 
     def end_reason() -> str | None:
         if ctl and ctl.current()["stop"]:
@@ -403,9 +417,16 @@ def main() -> None:
                     timing["classify_s"] = v["latency_s"]
             except Exception as e:  # one bad frame must not end a live session
                 errors += 1
+                bad_run += 1
                 print(f"{time.strftime('%H:%M:%S')} check failed: {e!r}", file=sys.stderr, flush=True)
                 log.emit("error", n=n, stage=stage, error=repr(e)[:300])
                 last_mark = time.time()
+                if bad_run >= BREAKER:  # ...but six in a row is a broken coach, not a bad frame
+                    hint = (
+                        "Check Screen Recording permission" if stage == "capture" else "If it repeats, check the logs"
+                    )
+                    trip(f"{bad_run} checks in a row failed. {hint}, then open ApexCompanion again.", repr(e))
+                    break
                 publish(last_state)
                 if args.once:
                     break
@@ -414,6 +435,7 @@ def main() -> None:
                 continue
             finally:
                 Path(shot).unlink(missing_ok=True)  # privacy claim: no frame outlives its check
+            bad_run = bad_run + 1 if v["category"] == "unparsed" else 0
             action = coach.observe(v["state"], time.monotonic())
             if v["category"] == "meeting":
                 action = None
@@ -478,6 +500,12 @@ def main() -> None:
                 timing=timing,
             )
             publish("meeting" if v["category"] == "meeting" else v["state"])
+            if bad_run >= BREAKER:
+                trip(
+                    f"{bad_run} checks in a row got no usable answer from the model. Open ApexCompanion again.",
+                    "unparsed model output: " + str(v.get("raw_unparsed", ""))[:200],
+                )
+                break
             if args.once:
                 break
             if end_reason() is None:
@@ -503,7 +531,7 @@ def main() -> None:
             stop_reason=stop_reason,
         )
         log.close()
-        publish("stopped")
+        publish("error" if stop_reason == "error" else "stopped")  # the launcher shows last_line after exit 3
         signal.signal(signal.SIGTERM, prev_term)
         if lock_fd is not None:
             os.close(lock_fd)
@@ -511,6 +539,10 @@ def main() -> None:
             f"\nsession {(time.time() - started) / 60 if started else 0:.1f} min · {checks} checks · "
             f"focused {focus_pct:.0f}% · call-outs {coach.strikes}"
         )
+    if stop_reason == "error":
+        sys.exit(3)
+    if args.once and bad_run:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 """Runtime hardening: what keeps a broken, hung, duplicated or disk-starved coach from pretending to coach."""
 
+import json
 import os
 import subprocess
 import sys
@@ -187,3 +188,102 @@ def test_replay_mode_never_sweeps(monkeypatch, tmp_path):
     img.write_bytes(b"\xff\xd8 frame")
     run_main(monkeypatch, tmp_path, checks=1, args=["--image", str(img)])
     assert (tmp / "apex_live.jpg").exists()
+
+
+# ---- broken-coach circuit breaker
+
+UNPARSED = {"app": "", "content": "", "category": "unparsed", "state": "working", "latency_s": 0.1}
+UNPARSED |= {"raw": "I cannot help with that", "raw_unparsed": "I cannot help with that"}
+
+
+def test_six_failed_checks_in_a_row_stop_the_coach_loudly(monkeypatch, tmp_path):
+    sd = tmp_path / "state"
+    seen = run_main(monkeypatch, tmp_path, checks=20, shots=[False] * 20, state_dir=sd)
+    assert seen["exit"] == 3
+    assert len(seen["screencapture"]) == apex.BREAKER  # stopped, not retrying forever
+    st = seen["state"]
+    assert (st["state"], st["stop_reason"]) == ("error", "error")
+    assert "6 checks in a row failed" in st["last_line"] and "Screen Recording" in st["last_line"]
+    assert seen["notify"] == [st["last_line"]]
+    breaker = [e for e in seen["events"] if e.get("stage") == "breaker"]
+    assert len(breaker) == 1 and "screencapture failed" in breaker[0]["error"]
+    assert seen["events"][-1]["event"] == "session_end" and seen["events"][-1]["stop_reason"] == "error"
+
+
+def test_unparsed_answers_trip_the_breaker(monkeypatch, tmp_path):
+    # Unparsed fails open to "working": without the breaker a dead model reads as perfect focus.
+    sd = tmp_path / "state"
+    seen = run_main(monkeypatch, tmp_path, checks=20, verdict=UNPARSED, state_dir=sd)
+    assert seen["exit"] == 3 and len(seen["classify"]) == apex.BREAKER
+    assert seen["state"]["state"] == "error" and "model" in seen["state"]["last_line"]
+    assert len(seen["state"]["last_line"]) <= 120
+    breaker = [e for e in seen["events"] if e.get("stage") == "breaker"]
+    assert "I cannot help with that" in breaker[0]["error"]
+
+
+def test_failures_and_unparsed_answers_count_together(monkeypatch, tmp_path):
+    seen = run_main(monkeypatch, tmp_path, checks=20, shots=[False] * 3, verdict=UNPARSED)
+    assert seen["exit"] == 3 and len(seen["screencapture"]) == apex.BREAKER
+
+
+def test_a_good_check_resets_the_breaker(monkeypatch, tmp_path):
+    shots = [False] * 5 + [True] + [False] * 5
+    seen = run_main(monkeypatch, tmp_path, checks=11, shots=shots, state_dir=tmp_path / "state")
+    assert seen["exit"] is None and seen["state"]["state"] == "stopped"
+    assert seen["events"][-1]["errors"] == 10
+
+
+def test_a_rule_check_resets_the_breaker(monkeypatch, tmp_path):
+    reddit, docs = "https://www.reddit.com/", "https://docs.python.org/"
+    urls = [docs] * 5 + [reddit] + [docs] * 5
+    seen = run_main(
+        monkeypatch,
+        tmp_path,
+        checks=11,
+        verdict=UNPARSED,
+        front_app="Safari",
+        url=urls,
+        sites="[distracting]\nreddit\n",
+    )
+    assert seen["exit"] is None and len(seen["classify"]) == 10
+
+
+def test_a_parsed_answer_resets_the_breaker(monkeypatch, tmp_path):
+    seen = run_main(monkeypatch, tmp_path, checks=11, verdicts=[UNPARSED] * 5 + [WORKING] + [UNPARSED] * 5)
+    assert seen["exit"] is None
+
+
+def test_state_json_keeps_error_after_exit(monkeypatch, tmp_path):
+    # The launcher reads state.json after exit code 3; "stopped" there would hide why.
+    sd = tmp_path / "state"
+    run_main(monkeypatch, tmp_path, checks=20, shots=[False] * 20, state_dir=sd)
+    st = json.loads((sd / "state.json").read_text())
+    assert st["state"] == "error" and st["last_line"].startswith("6 checks in a row failed")
+    assert len(st["last_line"]) <= 120 and "\n" not in st["last_line"]  # the UI adds "Stopped: " itself
+
+
+def test_model_failures_trip_the_breaker_with_a_log_hint(monkeypatch, tmp_path):
+    crash = RuntimeError("metal device lost")
+    seen = run_main(monkeypatch, tmp_path, checks=20, verdicts=[crash] * 20, state_dir=tmp_path / "state")
+    assert seen["exit"] == 3 and len(seen["classify"]) == apex.BREAKER
+    assert "check the logs" in seen["state"]["last_line"] and "Screen Recording" not in seen["state"]["last_line"]
+
+
+# ---- --once reports failure in its exit code
+
+
+def test_once_exits_nonzero_when_the_check_failed(monkeypatch, tmp_path):
+    seen = run_main(monkeypatch, tmp_path, checks=5, shots=[False], args=["--once"])
+    assert seen["exit"] == 1
+    assert seen["events"][-1]["event"] == "session_end"  # cleanup still ran
+    assert not list((tmp_path / "tmp").glob("apex_*.jpg"))
+
+
+def test_once_exits_nonzero_on_an_unparsed_answer(monkeypatch, tmp_path):
+    seen = run_main(monkeypatch, tmp_path, checks=5, verdict=UNPARSED, args=["--once"])
+    assert seen["exit"] == 1
+
+
+def test_once_exits_zero_on_a_good_check(monkeypatch, tmp_path):
+    seen = run_main(monkeypatch, tmp_path, checks=5, args=["--once"])
+    assert seen["exit"] is None and len(seen["log"]) == 1
