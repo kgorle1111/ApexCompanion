@@ -573,6 +573,18 @@ footer{border-top:1px solid var(--line);padding:56px 0 64px;background:var(--bg2
         <div class="what">Clear-cut pages on the batch used while tuning the prompt</div>
         <div class="how">28 pages used while tuning, so not a fair test on its own. Both batches pooled: 40/41 clear-cut across 51 pages (95% interval lower bound about 87%). One false roast happened on a page labeled ambiguous, a lofi study stream.</div>
       </div>
+      <div class="num-card">
+        <span class="badge m">A/B</span>
+        <div class="big">9 vs 15</div>
+        <div class="what">Asking Gemma "working or distracted?" vs letting code decide, on the 16 blind pages</div>
+        <div class="how">Same model, same categories, temperature 0. Across all 41 clear-cut pages: 29/41 vs 40/41, and distractions caught 6/18 vs 17/18. The yes/no prompt called the Steam store page for Hades "working". Small set, web pages only.</div>
+      </div>
+      <div class="num-card">
+        <span class="badge m">Live run</span>
+        <div class="big">624<small> checks</small></div>
+        <div class="what">One 52-minute session on a real desktop, 0 errors, 0 unreadable model outputs</div>
+        <div class="how">Author's own screen, Oct 24, 5 s interval. End to end per check: p50 1.29 s, p95 1.60 s. Measures reliability and speed, not accuracy: the checks are unlabeled.</div>
+      </div>
     </div>
 
     <div class="cfg" aria-label="Configured settings, not measurements">

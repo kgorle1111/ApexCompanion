@@ -350,6 +350,21 @@ Measured on an M3 Max, `mlx-community/gemma-4-e4b-it-8bit`, `mlx-vlm 0.7.10`, of
 
 Fixed settings (configuration, not measurements): 10 s check interval, 2 consecutive distracted checks before a roast, 60 s cooldown between roasts, screenshots downscaled to 1024 px on the long side.
 
+### Ceilings
+
+Where it breaks, for the one person it runs for. Full gap table and what's still unverified: [`HARDENING.md`](HARDENING.md).
+
+| Metric | Value | How we know |
+|---|---|---|
+| Coaches per Mac | **1** (a second one refuses to start) | single-instance lock; two would need about 22 GB |
+| Break point | **memory**: 11.3 GB peak footprint, so 16 GB Macs are tight and 24 GB is recommended | live, `/usr/bin/time -l` over a 306-check soak; 8 GB and 16 GB Macs not tested |
+| Time per check, live | **p50 1.29 s, p95 1.60 s** | live, 52-minute soak, n = 624 |
+| Shortest useful interval | about **1.6 s**; below that, checks run back to back (the loop never overlaps itself) | derived from the live p95 |
+| Cost per check | **$0**, no network calls after setup | on-device by design |
+| Largest input | one screenshot, downscaled to 1024 px on the long side; model output capped at 100 tokens (classify) and 80 (roast) | configuration |
+| When it gives up | **6 failed checks in a row**: it stops, says why, and shows ⚠︎ instead of pretending you're focused | broken-coach circuit breaker, unit-tested |
+| Log growth | session logs deleted after 7 days; `apex.log` rotated at 1 MB | configuration |
+
 ## Evaluating it
 
 `eval.py` runs the classifier over real screenshots in `evals/` against hand labels (`evals/labels.json`, `evals/labels2.json`) and prints accuracy and per-case latency. The repo has the labels and results (`evals/results*.json`), but not the screenshots: they're captures of third-party pages, so they're git-ignored. That means you can't rerun the eval from the repo alone.
@@ -384,7 +399,8 @@ Every line carries a session id, a schema version and an event:
 | `session_start` | persona, interval, cooldown, replay or screen mode, Python and macOS versions |
 | `model_ready` | model id, load time, memory |
 | `check` | verdict, category, rule hit, site host (never the full address), per-stage timing (`rules`, `capture`, `classify`, `roast`, `total`), whether the word filter replaced the line; screen text only when a roast fired |
-| `error` | which stage failed (`rules`, `capture`, `classify`, `roast`) and the error; the session keeps going |
+| `error` | which stage failed (`rules`, `capture`, `classify`, `roast`) and the error; the session keeps going. After 6 failed checks in a row it logs stage `breaker`, stops, and exits with code 3 |
+| `warning` | the warm-up answer didn't parse (the model loaded but may be answering badly) |
 | `session_end` | checks, roasts, errors, focus %, duration, peak memory |
 
 To read it:

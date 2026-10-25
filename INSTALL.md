@@ -97,10 +97,13 @@ The coach speaks out loud and names what's on your screen. In a shared space (a 
 3. Delete its data folder: in Finder, choose **Go → Go to Folder…**, paste `~/Library/Application Support/ApexCompanion`, press Return, and move the **ApexCompanion** folder to the Bin. That removes its engine, settings, site list and logs.
 4. If you already had the AI model on your Mac before installing (developers only), it lives in `~/.cache/huggingface` and is shared with other tools. Leave it unless you know you don't need it.
 5. Optional: remove ApexCompanion from **System Settings → Privacy & Security → Screen & System Audio Recording** (select it, click **–**).
-6. Optional: the **uv** helper lives in your home folder at `~/.local/bin/uv`. You can delete it if nothing else uses it.
+6. Optional: the **uv** helper lives in your home folder at `~/.local/bin/uv` (and `uvx` next to it). You can delete both if nothing else uses them.
+7. Optional: if you let ApexCompanion read your browser's current tab, remove that permission in **System Settings → Privacy & Security → Automation** (turn off your browser under ApexCompanion).
 
 ## If something goes wrong
 
+- **⚠︎ in the menu bar, or "The coach stopped itself after repeated errors"**: it gave up after 6 failed checks in a row instead of pretending you were focused. The message says why; most often Screen Recording was switched off. Fix that, then open the app again.
+- **"ApexCompanion is already running"**: only one coach runs at a time. Stop the other one from the menu bar first.
 - **"The coach stopped unexpectedly"**: open the app again. If it keeps happening, the details are in `~/Library/Application Support/ApexCompanion/logs/`.
 - **It never calls you out, even on YouTube**: check the menu bar first. **⏸** means it's paused (choose **Resume**), and **in a call** means a call app or meeting tab is in front. Otherwise Screen Recording is probably off. Check the switch in System Settings (step 5 above), then open the app again.
 - **No notifications show up**: check **System Settings → Notifications** and allow notifications for **Script Editor** (macOS shows ApexCompanion's notifications under that name).
