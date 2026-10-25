@@ -1,10 +1,14 @@
-"""A/B baseline: the original yes/no prompt vs the shipped describe-then-categorize pipeline.
+"""A/B baseline: a yes/no prompt vs the shipped describe-then-categorize pipeline.
 
-Runs the binary prompt over the clear-cut (non-ambiguous) cases of evals/labels.json and evals/labels2.json,
+Two yes/no prompts: "fair" lists the same working/distracted coverage as the shipped category map (the headline
+comparison); "original" is the narrower first-version rubric (entertainment and social media only).
+
+Runs the chosen prompt over the clear-cut (non-ambiguous) cases of evals/labels.json and evals/labels2.json,
 compares with the shipped results in evals/results.json and evals/results_labels2.json, prints a table and a
-summary, and writes evals/results_binary_baseline.json. labels2.json is the blind batch (captured after tuning).
+summary, and updates that prompt's entry in evals/results_binary_baseline.json (the other entry is kept).
+labels2.json is the blind batch (captured after tuning).
 
-Usage: .venv/bin/python evals/binary_baseline.py [--images-root DIR]
+Usage: .venv/bin/python evals/binary_baseline.py [--prompt fair|original] [--images-root DIR]
 The screenshots are git-ignored; point --images-root at an evals/ dir that has web/ and web2/.
 """
 
@@ -17,11 +21,19 @@ from pathlib import Path
 EVALS = Path(__file__).resolve().parent
 sys.path.insert(0, str(EVALS.parent))  # gemma.py lives at the repo root
 
-BIN = (
-    "Look at this screenshot of a student laptop. Coding, docs, notes and educational videos count as working; "
-    "entertainment and social media count as distracted. "
-    'Reply ONLY JSON: {"state":"working" or "distracted","reason":"<8 words describing what is on screen>"}'
-)
+_REPLY = 'Reply ONLY JSON: {"state":"working" or "distracted","reason":"<8 words describing what is on screen>"}'
+PROMPTS = {
+    "fair": (
+        "Look at this screenshot of a student laptop. Working = coding, reading docs or articles, notes, messaging, "
+        "news, or an educational video. Distracted = entertainment video, social media, shopping, gaming, a feed of "
+        "recommended videos/images/posts, or sports. Ignore ads, banners and pop-ups. " + _REPLY
+    ),
+    "original": (
+        "Look at this screenshot of a student laptop. Coding, docs, notes and educational videos count as working; "
+        "entertainment and social media count as distracted. " + _REPLY
+    ),
+}
+OUT = EVALS / "results_binary_baseline.json"
 # (labels file, shipped results file, is the blind batch)
 BATCHES = [("labels.json", "results.json", False), ("labels2.json", "results_labels2.json", True)]
 
@@ -50,6 +62,7 @@ def summarize(rows: list[dict], key: str) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--prompt", choices=sorted(PROMPTS), default="fair", help="fair = same coverage as shipped")
     ap.add_argument("--images-root", type=Path, default=EVALS, help="evals/ dir holding web/ and web2/ screenshots")
     args = ap.parse_args()
 
@@ -69,11 +82,13 @@ def main() -> int:
 
     import gemma  # heavy import after cheap checks
 
+    prompt = PROMPTS[args.prompt]
     gemma.load_model()
+    print(f"prompt: {args.prompt}")
     hdr = f"{'file':34} {'label':10} {'binary':10} {'shipped':10}  binary reason"
     print(hdr + "\n" + "-" * len(hdr))
     for c in cases:
-        raw = gemma._run(BIN, str(args.images_root / c["file"]), max_tokens=60, temperature=0.0)
+        raw = gemma._run(prompt, str(args.images_root / c["file"]), max_tokens=60, temperature=0.0)
         c["binary_state"] = parse_state(raw)
         c["binary_reason"] = parse_reason(raw)
         c["binary_raw"] = raw[:200]
@@ -96,23 +111,22 @@ def main() -> int:
                 f"{x['distracted_caught']}/{x['distracted_n']}  false roasts {len(x['false_roasts'])} {x['false_roasts']}"
             )
 
-    out = EVALS / "results_binary_baseline.json"
-    out.write_text(
+    variants = json.loads(OUT.read_text()).get("variants", {}) if OUT.is_file() else {}
+    variants[args.prompt] = {"prompt": prompt, "summary": summary, "cases": cases}
+    OUT.write_text(
         json.dumps(
             {
-                "prompt": BIN,
                 "model": f"{gemma.MODEL_ID}@{gemma.MODEL_REVISION}",
                 "max_tokens": 60,
                 "temperature": 0.0,
                 "shipped_source": [r for _, r, _ in BATCHES],
-                "summary": summary,
-                "cases": cases,
+                "variants": dict(sorted(variants.items())),
             },
             indent=2,
         )
         + "\n"
     )
-    print(f"\nwrote {out.relative_to(EVALS.parent)}")
+    print(f"\nwrote {args.prompt!r} to {OUT.relative_to(EVALS.parent)}")
     return 0
 
 
