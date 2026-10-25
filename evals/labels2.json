@@ -5,7 +5,9 @@
     "source": "https://en.wikipedia.org/wiki/Recursion_(computer_science)",
     "ambiguous": false,
     "holdout": false,
-    "note": "Wikipedia article on a programming topic; donation/event banner at top"
+    "note": "Wikipedia article on a programming topic; donation/event banner at top",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_vscode_dev.jpg",
@@ -13,7 +15,9 @@
     "source": "https://vscode.dev/",
     "ambiguous": false,
     "holdout": false,
-    "note": "vscode.dev Welcome editor, no folder open (dark theme)"
+    "note": "vscode.dev Welcome editor, no folder open (dark theme)",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_mit_ocw.jpg",
@@ -21,7 +25,9 @@
     "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/pages/lecture-notes/",
     "ambiguous": false,
     "holdout": false,
-    "note": "MIT OCW 6.006 lecture-notes table"
+    "note": "MIT OCW 6.006 lecture-notes table",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_nbviewer_numpy.jpg",
@@ -29,7 +35,9 @@
     "source": "https://nbviewer.org/github/jakevdp/PythonDataScienceHandbook/blob/master/notebooks/02.02-The-Basics-Of-NumPy-Arrays.ipynb",
     "ambiguous": false,
     "holdout": false,
-    "note": "nbviewer Jupyter notebook scrolled to In/Out code cells (NumPy arrays)"
+    "note": "nbviewer Jupyter notebook scrolled to In/Out code cells (NumPy arrays)",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_devto_article.jpg",
@@ -37,7 +45,9 @@
     "source": "https://dev.to/lydiahallie/javascript-visualized-event-loop-3dif",
     "ambiguous": false,
     "holdout": false,
-    "note": "dev.to JS event-loop article, scrolled ~700px after closing a DEV popup; viewport shows series nav + embedded YouTube explainer video thumbnail + promoted Hacktoberfest card in sidebar"
+    "note": "dev.to JS event-loop article, scrolled ~700px after closing a DEV popup; viewport shows series nav + embedded YouTube explainer video thumbnail + promoted Hacktoberfest card in sidebar",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_kaggle_notebook.jpg",
@@ -45,7 +55,9 @@
     "source": "https://www.kaggle.com/code/alexisbcook/titanic-tutorial",
     "ambiguous": false,
     "holdout": false,
-    "note": "Kaggle Titanic tutorial notebook (logged out); cookie notice bar at bottom left un-clicked"
+    "note": "Kaggle Titanic tutorial notebook (logged out); cookie notice bar at bottom left un-clicked",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_figma_community.jpg",
@@ -53,7 +65,9 @@
     "source": "https://www.figma.com/community/file/1035203688168086460",
     "ambiguous": true,
     "holdout": false,
-    "note": "Figma Community file page (Material 3 Design Kit): big cover art + 'Open in Figma'; marketing-ish listing rather than an open canvas; cookie banner at bottom"
+    "note": "Figma Community file page (Material 3 Design Kit): big cover art + 'Open in Figma'; marketing-ish listing rather than an open canvas; cookie banner at bottom",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_google_sheets.jpg",
@@ -61,7 +75,9 @@
     "source": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit",
     "ambiguous": false,
     "holdout": false,
-    "note": "Google Sheets public example spreadsheet (Class Data), view-only, logged out"
+    "note": "Google Sheets public example spreadsheet (Class Data), view-only, logged out",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_asciinema_terminal.jpg",
@@ -69,7 +85,9 @@
     "source": "https://asciinema.org/a/335480",
     "ambiguous": false,
     "holdout": false,
-    "note": "terminal-looking page: asciinema recording poster frame showing a bash session (brew install, shasum output) with play overlay; substitute for a GitHub Actions log"
+    "note": "terminal-looking page: asciinema recording poster frame showing a bash session (brew install, shasum output) with play overlay; substitute for a GitHub Actions log",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_github_actions_log.jpg",
@@ -77,7 +95,9 @@
     "source": "https://github.com/python/cpython/actions/runs/40134137280/job/120991940501",
     "ambiguous": false,
     "holdout": false,
-    "note": "GitHub Actions job page (cpython notify-new-bugs-announce), dark theme; logged out so log text is gated ('Sign in to view logs') - only the collapsed step list is visible, NOT terminal output"
+    "note": "GitHub Actions job page (cpython notify-new-bugs-announce), dark theme; logged out so log text is gated ('Sign in to view logs') - only the collapsed step list is visible, NOT terminal output",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_chatgpt_home.jpg",
@@ -85,7 +105,9 @@
     "source": "https://chatgpt.com/",
     "ambiguous": true,
     "holdout": false,
-    "note": "ChatGPT logged-out empty chat ('Where should we begin?'); AI chat could be work or play, no content to disambiguate"
+    "note": "ChatGPT logged-out empty chat ('Where should we begin?'); AI chat could be work or play, no content to disambiguate",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_gemini_app.jpg",
@@ -93,7 +115,9 @@
     "source": "https://gemini.google.com/app",
     "ambiguous": true,
     "holdout": false,
-    "note": "Gemini logged-out empty chat ('Meet Gemini'); same ambiguity as ChatGPT"
+    "note": "Gemini logged-out empty chat ('Meet Gemini'); same ambiguity as ChatGPT",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/w_notion_templates.jpg",
@@ -101,7 +125,9 @@
     "source": "https://www.notion.com/templates/category/engineering",
     "ambiguous": true,
     "holdout": false,
-    "note": "Notion Engineering templates gallery (marketing page, NOT a public Notion doc - no quick public doc URL found); cookie banner bottom-right left un-clicked (scripted Reject-all lookup did not find the button)"
+    "note": "Notion Engineering templates gallery (marketing page, NOT a public Notion doc - no quick public doc URL found); cookie banner bottom-right left un-clicked (scripted Reject-all lookup did not find the button)",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/d_reddit_funny.jpg",
@@ -109,7 +135,9 @@
     "source": "https://www.reddit.com/r/funny/",
     "ambiguous": false,
     "holdout": false,
-    "note": "r/funny logged out (new Reddit; old.reddit redirected to a login wall); lion meme post visible, sign-up sidebar"
+    "note": "r/funny logged out (new Reddit; old.reddit redirected to a login wall); lion meme post visible, sign-up sidebar",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/d_instagram_loginwall.jpg",
@@ -117,7 +145,9 @@
     "source": "https://www.instagram.com/natgeo/",
     "ambiguous": true,
     "holdout": false,
-    "note": "FAILED RENDER: Instagram redirected public profile to the login wall - no feed content, only Instagram branding + login form"
+    "note": "FAILED RENDER: Instagram redirected public profile to the login wall - no feed content, only Instagram branding + login form",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/d_spotify_playlist.jpg",
@@ -125,7 +155,9 @@
     "source": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
     "ambiguous": true,
     "holdout": false,
-    "note": "Spotify web 'Today's Top Hits' playlist page, logged out; background music is arguably fine (batch-1 lofi precedent was labeled working/ambiguous) but this is a pop playlist in the foreground"
+    "note": "Spotify web 'Today's Top Hits' playlist page, logged out; background music is arguably fine (batch-1 lofi precedent was labeled working/ambiguous) but this is a pop playlist in the foreground",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/d_youtube_shorts.jpg",
@@ -133,7 +165,9 @@
     "source": "https://www.youtube.com/shorts",
     "ambiguous": false,
     "holdout": false,
-    "note": "YouTube Shorts vertical player (basketball-history short), logged out"
+    "note": "YouTube Shorts vertical player (basketball-history short), logged out",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/d_pinterest_ideas.jpg",
@@ -141,7 +175,9 @@
     "source": "https://www.pinterest.com/ideas/",
     "ambiguous": false,
     "holdout": false,
-    "note": "Pinterest explore boards behind a 'Log in to see more' modal; pins (Halloween, recipes, fashion) visible around the modal"
+    "note": "Pinterest explore boards behind a 'Log in to see more' modal; pins (Halloween, recipes, fashion) visible around the modal",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/d_pagesix_gossip.jpg",
@@ -149,7 +185,9 @@
     "source": "https://pagesix.com/",
     "ambiguous": true,
     "holdout": false,
-    "note": "Page Six celebrity gossip homepage; above-the-fold is mostly ads plus 'EX-WIFE'S WARNING' headline; ambiguous given the user's ruling that news front pages = working, though gossip != news"
+    "note": "Page Six celebrity gossip homepage; above-the-fold is mostly ads plus 'EX-WIFE'S WARNING' headline; ambiguous given the user's ruling that news front pages = working, though gossip != news",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/d_etsy_category.jpg",
@@ -157,7 +195,9 @@
     "source": "https://www.etsy.com/c/jewelry",
     "ambiguous": false,
     "holdout": false,
-    "note": "Etsy jewelry category grid; cookie notice bottom-right left un-clicked"
+    "note": "Etsy jewelry category grid; cookie notice bottom-right left un-clicked",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/d_ebay_sneakers.jpg",
@@ -165,7 +205,9 @@
     "source": "https://www.ebay.com/b/Sneakers/15709/bn_57918",
     "ambiguous": false,
     "holdout": false,
-    "note": "eBay Men's Sneakers category (online shopping)"
+    "note": "eBay Men's Sneakers category (online shopping)",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/d_steam_store.jpg",
@@ -173,7 +215,9 @@
     "source": "https://store.steampowered.com/app/1145360/Hades/",
     "ambiguous": false,
     "holdout": false,
-    "note": "Steam store page for Hades (game art, trailer strip)"
+    "note": "Steam store page for Hades (game art, trailer strip)",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   },
   {
     "file": "web2/d_9gag_home.jpg",
@@ -181,6 +225,8 @@
     "source": "https://9gag.com/",
     "ambiguous": false,
     "holdout": false,
-    "note": "9GAG home feed with meme/video post + ads; page load timed out at 10s but rendered"
+    "note": "9GAG home feed with meme/video post + ads; page load timed out at 10s but rendered",
+    "reviewed_by_human": true,
+    "reviewed_on": "2026-10-24"
   }
 ]

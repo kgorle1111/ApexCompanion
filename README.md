@@ -261,7 +261,7 @@ flowchart TD
 
 ## Design decision: the model never says "distracted"
 
-The first version asked Gemma one question: is this screenshot `working` or `distracted`? It labeled a YouTube cat compilation "working". Gemma 4 did it, and so did Gemma 3 when we tried it as a cross-check.
+The first version asked Gemma one question: is this screenshot `working` or `distracted`? It labeled a YouTube cat compilation (a synthetic test image) "working". Gemma 4 did it, and so did Gemma 3 when we tried it as a cross-check.
 
 A binary label gives the model room to rationalize ("maybe they're researching cats"). So we split the job:
 
@@ -271,6 +271,18 @@ A binary label gives the model room to rationalize ("maybe they're researching c
 With describe-then-categorize, the same cat video landed in a distracted category, so the code called it distracted.
 
 That fix started as **one synthetic test case**. The real-page eval came after: on a blind batch of 23 real public web pages captured after tuning, the classifier got **15/16 clear-cut pages right** (Wilson 95% interval about 72% to 99%), with **0 false roasts on clear-cut pages** (details under [Evaluating it](#evaluating-it)).
+
+**Measured A/B.** We later ran a yes/no prompt against the shipped pipeline on the same 41 clear-cut real pages (same model, temperature 0; `evals/binary_baseline.py`, results in `evals/results_binary_baseline.json`). The headline yes/no prompt lists the same working and distracted kinds of screen as the shipped category map, so the comparison is mostly about who says the verdict (the shipped prompt also adds a few one-line definitions, such as what counts as a feed):
+
+| Clear-cut pages | Correct | Distractions caught | False roasts | **Correct, blind batch only** |
+|---|---|---|---|---|
+| Shipped (describe, then code decides) | 40/41 | 17/18 | 0 | **15/16** |
+| Yes/no, same rubric as shipped | 29/41 | 6/18 | 0 | **9/16** (0/7 distractions caught) |
+| Yes/no, original narrow rubric¹ | 27/41 | 5/18 | 1 | 11/16 |
+
+¹ Names only entertainment and social media; its false roast was a CNN page with a pop-up. Run with `--prompt original`.
+
+Even with the full rubric, the yes/no prompt often described the screen correctly and still said working: the Steam store came back "working" with the reason "Reading game store page for Hades". Other misses echoed the rubric instead of describing the page ("Coding, reading docs, and notes visible" on Reddit). Caveats: the shipped prompt was tuned on batch 1, so the blind-batch column is the fair comparison, and it is only 16 pages.
 
 It's the pattern we default to: deterministic guards around one structured model call, and code owns the final decision. The debounce, cooldown, and fail-open default are plain Python (`Coach` in `apex.py`, no I/O) with unit tests in `tests/`. Your site list (`rules.py`) works the same way: plain code, checked before the model call, which it skips on a hit.
 
@@ -324,7 +336,7 @@ Measured on an M3 Max, `mlx-community/gemma-4-e4b-it-8bit`, `mlx-vlm 0.7.10`, of
 | Roast generation | **0.57 to 0.79 s** | |
 | Peak memory | **11.3 GB** footprint | `/usr/bin/time -l` over a 306-check soak; steady state 8.6–8.9 GB, no growth seen in 5 min |
 | End-to-end check | 2 distracted checks → spoken roast | worked once, on a synthetic image |
-| **Batch 2, blind** (23 pages, never tuned on) | **15/16** clear-cut (Wilson 95% interval about 72% to 99%), **21/23** overall, 0 false roasts on clear-cut pages | the headline; captured after prompt tuning finished; labels not reviewed by a person |
+| **Batch 2, blind** (23 pages, never tuned on) | **15/16** clear-cut (Wilson 95% interval about 72% to 99%), **21/23** overall, 0 false roasts on clear-cut pages | the headline; captured after prompt tuning finished; labels hand-checked by the author (Oct 24), not an independent reviewer |
 | Batch 2 distracted recall, clear-cut | **6/7** | exactly at the 0.85 gate |
 | Batch 1, tuning set (28 pages, used while tuning) | **25/25** clear-cut, **26/28** overall | not a fair test on its own |
 | Both batches pooled | **40/41** clear-cut across 51 pages (95% interval lower bound about 87%); distracted recall **17/18** | secondary; one false roast, on a page labeled ambiguous |
@@ -339,7 +351,7 @@ Fixed settings (configuration, not measurements): 10 s check interval, 2 consecu
 
 Pages a reasonable person could call either way are labeled ambiguous and reported separately. All runs: Gemma 4 E4B 8-bit, `mlx-vlm 0.7.10`, M3 Max, offline.
 
-**Batch 2 (the headline): 23 pages, blind.** Captured after prompt tuning had finished, and never used to tune anything. The labels are provisional: they have not been reviewed by a person yet.
+**Batch 2 (the headline): 23 pages, blind.** Captured after prompt tuning had finished, and never used to tune anything. The labels, including which pages are ambiguous, were hand-checked by the author (Oct 24); no independent reviewer has checked them.
 - Clear-cut pages: **15/16** (Wilson 95% interval about 72% to 99%), with **0 false roasts on clear-cut pages**.
 - All 23 pages: **21/23**.
 - Distracted recall: **6/7**, exactly at the 0.85 gate.
@@ -386,7 +398,7 @@ The menu bar and the coach talk through two small local files, `state.json` and 
 
 - **Web pages only.** The eval is 51 real web pages captured in a headless browser. No native-app frames (VS Code, the terminal, the native Spotify app, games) and no real desktop frames were tested. Your site list can cover a native app by name.
 - **Fail-open categories hide misses.** Anything filed under "other", or misfiled into a working category, counts as working and is never roasted. In the blind batch, a Shorts clip went to `educational_video` and a Page Six gossip page to `news_reading`. The built-in Shorts rule now covers the first case in supported browsers.
-- **Small eval, one labeler.** 16 blind clear-cut cases is a small set; one miss is about 6 points. The labeler is the author, and batch-2 labels have not been reviewed by a person.
+- **Small eval, one labeler.** 16 blind clear-cut cases is a small set; one miss is about 6 points. The labeler is the author: batch-2 labels were hand-checked by the author (Oct 24), but no independent reviewer has checked either batch.
 - **Not reproducible from the repo.** Labels and results are committed; the screenshots are not (third-party pages).
 - **Heavy for a background app.** 11.3 GB peak memory footprint, and a vision call every 10 seconds. Expect trouble on Macs with little unified memory, and expect it to cost more battery than a text-first approach.
 - **Mac only.** `screencapture`, `sips`, `osascript`, `say`, and MLX are all macOS / Apple Silicon.

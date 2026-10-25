@@ -1,0 +1,829 @@
+{
+  "model": "mlx-community/gemma-4-e4b-it-8bit@4255b21bd9a9d3fc807ef7abd80373f5e3a52a73",
+  "max_tokens": 60,
+  "temperature": 0.0,
+  "shipped_source": [
+    "results.json",
+    "results_labels2.json"
+  ],
+  "variants": {
+    "fair": {
+      "prompt": "Look at this screenshot of a student laptop. Working = coding, reading docs or articles, notes, messaging, news, or an educational video. Distracted = entertainment video, social media, shopping, gaming, a feed of recommended videos/images/posts, or sports. Ignore ads, banners and pop-ups. Reply ONLY JSON: {\"state\":\"working\" or \"distracted\",\"reason\":\"<8 words describing what is on screen>\"}",
+      "summary": {
+        "overall": {
+          "binary": {
+            "n": 41,
+            "correct": 29,
+            "distracted_n": 18,
+            "distracted_caught": 6,
+            "false_roasts": []
+          },
+          "shipped": {
+            "n": 41,
+            "correct": 40,
+            "distracted_n": 18,
+            "distracted_caught": 17,
+            "false_roasts": []
+          }
+        },
+        "blind_batch_only": {
+          "binary": {
+            "n": 16,
+            "correct": 9,
+            "distracted_n": 7,
+            "distracted_caught": 0,
+            "false_roasts": []
+          },
+          "shipped": {
+            "n": 16,
+            "correct": 15,
+            "distracted_n": 7,
+            "distracted_caught": 6,
+            "false_roasts": []
+          }
+        }
+      },
+      "cases": [
+        {
+          "file": "web/w_github_source.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding in a software development environment",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding in a software development environment\"}"
+        },
+        {
+          "file": "web/w_python_docs.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding and reading documentation for asyncio",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding and reading documentation for asyncio\"}"
+        },
+        {
+          "file": "web/w_mdn_docs.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding and reading documentation for JavaScript",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding and reading documentation for JavaScript\"}"
+        },
+        {
+          "file": "web/w_stackoverflow.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding and reading technical documentation",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding and reading technical documentation\"}"
+        },
+        {
+          "file": "web/w_arxiv.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Reading academic paper on arXiv",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading academic paper on arXiv\"}"
+        },
+        {
+          "file": "web/w_yt_python_tutorial_ad.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding or reading documentation on screen",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding or reading documentation on screen\"}"
+        },
+        {
+          "file": "web/w_yt_3b1b_lecture.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Educational video about neural networks",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Educational video about neural networks\"}"
+        },
+        {
+          "file": "web/w_khan_video.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Watching educational video on linear algebra",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Watching educational video on linear algebra\"}"
+        },
+        {
+          "file": "web/w_colab_notebook.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding Python tutorial on NumPy arrays",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding Python tutorial on NumPy arrays\"}"
+        },
+        {
+          "file": "web/w_leetcode.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding a problem on a platform",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding a problem on a platform\"}"
+        },
+        {
+          "file": "web/w_rust_book.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Reading documentation about Rust programming language",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading documentation about Rust programming language\"}"
+        },
+        {
+          "file": "web/w_github_pr_diff.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding on GitHub issue tracker",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding on GitHub issue tracker\"}"
+        },
+        {
+          "file": "web/d_yt_cats.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Blue background with paw prints",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Blue background with paw prints\"}"
+        },
+        {
+          "file": "web/d_yt_home_feed.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Student laptop showing educational content",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Student laptop showing educational content\"}"
+        },
+        {
+          "file": "web/d_yt_minecraft.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Minecraft gameplay video is playing",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Minecraft gameplay video is playing\"}"
+        },
+        {
+          "file": "web/d_imgur_viral.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Coding, reading docs, and taking notes",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding, reading docs, and taking notes\"}"
+        },
+        {
+          "file": "web/d_x_profile.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Reading NASA post about Artemis III mission",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading NASA post about Artemis III mission\"}"
+        },
+        {
+          "file": "web/d_tiktok_profile.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "NBA information and video content",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"NBA information and video content\"}"
+        },
+        {
+          "file": "web/d_amazon_product.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Reading product details on Amazon website",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading product details on Amazon website\"}"
+        },
+        {
+          "file": "web/d_twitch_stream.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Watching live stream of gaming content",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Watching live stream of gaming content\"}"
+        },
+        {
+          "file": "web/d_game_2048.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Playing 2048 game on laptop",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Playing 2048 game on laptop\"}"
+        },
+        {
+          "file": "web/d_netflix_landing.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Netflix sign-up page for movies and shows",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Netflix sign-up page for movies and shows\"}"
+        },
+        {
+          "file": "web/d_espn.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Watching sports highlights on ESPN",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Watching sports highlights on ESPN\"}"
+        },
+        {
+          "file": "web/a_hackernews.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Reading technical documentation or articles",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading technical documentation or articles\"}"
+        },
+        {
+          "file": "web/a_cnn_news.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Reading news articles on CNN website",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading news articles on CNN website\"}"
+        },
+        {
+          "file": "web2/w_wikipedia_recursion.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Reading Wikipedia article on recursion",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading Wikipedia article on recursion\"}"
+        },
+        {
+          "file": "web2/w_vscode_dev.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Visual Studio Code interface open",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Visual Studio Code interface open\"}"
+        },
+        {
+          "file": "web2/w_mit_ocw.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Reading lecture notes for algorithms course",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading lecture notes for algorithms course\"}"
+        },
+        {
+          "file": "web2/w_nbviewer_numpy.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding in a Jupyter notebook environment",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding in a Jupyter notebook environment\"}"
+        },
+        {
+          "file": "web2/w_devto_article.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Watching educational video on JavaScript",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Watching educational video on JavaScript\"}"
+        },
+        {
+          "file": "web2/w_kaggle_notebook.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Reading a Kaggle tutorial notebook",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading a Kaggle tutorial notebook\"}"
+        },
+        {
+          "file": "web2/w_google_sheets.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Student spreadsheet with class data",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Student spreadsheet with class data\"}"
+        },
+        {
+          "file": "web2/w_asciinema_terminal.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding using terminal to install software",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding using terminal to install software\"}"
+        },
+        {
+          "file": "web2/w_github_actions_log.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding on GitHub repository page",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding on GitHub repository page\"}"
+        },
+        {
+          "file": "web2/d_reddit_funny.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Coding, reading docs, and notes visible",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding, reading docs, and notes visible\"}"
+        },
+        {
+          "file": "web2/d_youtube_shorts.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Educational video playing on screen",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Educational video playing on screen\"}"
+        },
+        {
+          "file": "web2/d_pinterest_ideas.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Coding, reading docs, and notes on laptop",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding, reading docs, and notes on laptop\"}"
+        },
+        {
+          "file": "web2/d_etsy_category.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Coding or reading educational documents",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding or reading educational documents\"}"
+        },
+        {
+          "file": "web2/d_ebay_sneakers.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Reading articles or documentation on screen",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading articles or documentation on screen\"}"
+        },
+        {
+          "file": "web2/d_steam_store.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Reading game store page for Hades",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading game store page for Hades\"}"
+        },
+        {
+          "file": "web2/d_9gag_home.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Coding, reading docs, and messaging",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding, reading docs, and messaging\"}"
+        }
+      ]
+    },
+    "original": {
+      "prompt": "Look at this screenshot of a student laptop. Coding, docs, notes and educational videos count as working; entertainment and social media count as distracted. Reply ONLY JSON: {\"state\":\"working\" or \"distracted\",\"reason\":\"<8 words describing what is on screen>\"}",
+      "summary": {
+        "overall": {
+          "binary": {
+            "n": 41,
+            "correct": 27,
+            "distracted_n": 18,
+            "distracted_caught": 5,
+            "false_roasts": [
+              "web/a_cnn_news.jpg"
+            ]
+          },
+          "shipped": {
+            "n": 41,
+            "correct": 40,
+            "distracted_n": 18,
+            "distracted_caught": 17,
+            "false_roasts": []
+          }
+        },
+        "blind_batch_only": {
+          "binary": {
+            "n": 16,
+            "correct": 11,
+            "distracted_n": 7,
+            "distracted_caught": 2,
+            "false_roasts": []
+          },
+          "shipped": {
+            "n": 16,
+            "correct": 15,
+            "distracted_n": 7,
+            "distracted_caught": 6,
+            "false_roasts": []
+          }
+        }
+      },
+      "cases": [
+        {
+          "file": "web/w_github_source.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding in IDE, viewing documentation",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding in IDE, viewing documentation\"}"
+        },
+        {
+          "file": "web/w_python_docs.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Reading Python documentation on coroutines",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading Python documentation on coroutines\"}"
+        },
+        {
+          "file": "web/w_mdn_docs.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding tutorial on Array.prototype.map()",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding tutorial on Array.prototype.map()\"}"
+        },
+        {
+          "file": "web/w_stackoverflow.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding, documentation, and educational videos",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding, documentation, and educational videos\"}"
+        },
+        {
+          "file": "web/w_arxiv.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Academic paper displayed on screen",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Academic paper displayed on screen\"}"
+        },
+        {
+          "file": "web/w_yt_python_tutorial_ad.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding, docs, and educational videos are visible.",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding, docs, and educational videos are visible.\"}"
+        },
+        {
+          "file": "web/w_yt_3b1b_lecture.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Educational video about neural networks",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Educational video about neural networks\"}"
+        },
+        {
+          "file": "web/w_khan_video.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Khan Academy math lesson on linear algebra",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Khan Academy math lesson on linear algebra\"}"
+        },
+        {
+          "file": "web/w_colab_notebook.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Student is coding in a Jupyter notebook.",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Student is coding in a Jupyter notebook.\"}"
+        },
+        {
+          "file": "web/w_leetcode.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Student is coding a problem on a platform.",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Student is coding a problem on a platform.\"}"
+        },
+        {
+          "file": "web/w_rust_book.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Reading programming language documentation",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Reading programming language documentation\"}"
+        },
+        {
+          "file": "web/w_github_pr_diff.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding in a code editor interface",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding in a code editor interface\"}"
+        },
+        {
+          "file": "web/d_yt_cats.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Watching YouTube with cat videos",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Watching YouTube with cat videos\"}"
+        },
+        {
+          "file": "web/d_yt_home_feed.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Student laptop showing coding and docs",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Student laptop showing coding and docs\"}"
+        },
+        {
+          "file": "web/d_yt_minecraft.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Minecraft gameplay video on screen",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Minecraft gameplay video on screen\"}"
+        },
+        {
+          "file": "web/d_imgur_viral.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Coding, docs, notes, and educational videos",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding, docs, notes, and educational videos\"}"
+        },
+        {
+          "file": "web/d_x_profile.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Social media platform interface is visible",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Social media platform interface is visible\"}"
+        },
+        {
+          "file": "web/d_tiktok_profile.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "NBA page showing game schedules and videos",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"NBA page showing game schedules and videos\"}"
+        },
+        {
+          "file": "web/d_amazon_product.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Product page for Apple AirPods Pro 2",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Product page for Apple AirPods Pro 2\"}"
+        },
+        {
+          "file": "web/d_twitch_stream.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Watching Twitch stream of gaming content",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Watching Twitch stream of gaming content\"}"
+        },
+        {
+          "file": "web/d_game_2048.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Playing 2048 math game on laptop",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Playing 2048 math game on laptop\"}"
+        },
+        {
+          "file": "web/d_netflix_landing.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Netflix sign-up page for streaming service",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Netflix sign-up page for streaming service\"}"
+        },
+        {
+          "file": "web/d_espn.jpg",
+          "label": "distracted",
+          "blind": false,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Watching educational video on ESPN",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Watching educational video on ESPN\"}"
+        },
+        {
+          "file": "web/a_hackernews.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Coding, docs, and educational videos visible",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding, docs, and educational videos visible\"}"
+        },
+        {
+          "file": "web/a_cnn_news.jpg",
+          "label": "working",
+          "blind": false,
+          "shipped_state": "working",
+          "binary_state": "distracted",
+          "binary_reason": "Pop-up window covering content",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Pop-up window covering content\"}"
+        },
+        {
+          "file": "web2/w_wikipedia_recursion.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Computer science article on recursion",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Computer science article on recursion\"}"
+        },
+        {
+          "file": "web2/w_vscode_dev.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Visual Studio Code interface open",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Visual Studio Code interface open\"}"
+        },
+        {
+          "file": "web2/w_mit_ocw.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Viewing course lecture notes and syllabus",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Viewing course lecture notes and syllabus\"}"
+        },
+        {
+          "file": "web2/w_nbviewer_numpy.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Student is coding in a Jupyter notebook.",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Student is coding in a Jupyter notebook.\"}"
+        },
+        {
+          "file": "web2/w_devto_article.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Watching educational video about JavaScript",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Watching educational video about JavaScript\"}"
+        },
+        {
+          "file": "web2/w_kaggle_notebook.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Viewing Kaggle Titanic Tutorial notebook",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Viewing Kaggle Titanic Tutorial notebook\"}"
+        },
+        {
+          "file": "web2/w_google_sheets.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Spreadsheet showing student data",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Spreadsheet showing student data\"}"
+        },
+        {
+          "file": "web2/w_asciinema_terminal.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Terminal showing software installation process",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Terminal showing software installation process\"}"
+        },
+        {
+          "file": "web2/w_github_actions_log.jpg",
+          "label": "working",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Viewing GitHub repository for coding project",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Viewing GitHub repository for coding project\"}"
+        },
+        {
+          "file": "web2/d_reddit_funny.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Coding, docs, notes, and educational videos",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Coding, docs, notes, and educational videos\"}"
+        },
+        {
+          "file": "web2/d_youtube_shorts.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "working",
+          "binary_state": "working",
+          "binary_reason": "Educational video playing on laptop screen",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Educational video playing on laptop screen\"}"
+        },
+        {
+          "file": "web2/d_pinterest_ideas.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Pinterest interface showing login prompt",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Pinterest interface showing login prompt\"}"
+        },
+        {
+          "file": "web2/d_etsy_category.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Etsy jewelry search results page",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Etsy jewelry search results page\"}"
+        },
+        {
+          "file": "web2/d_ebay_sneakers.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Laptop screen shows educational content",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Laptop screen shows educational content\"}"
+        },
+        {
+          "file": "web2/d_steam_store.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "working",
+          "binary_reason": "Steam game store page for Hades",
+          "binary_raw": "{\"state\":\"working\",\"reason\":\"Steam game store page for Hades\"}"
+        },
+        {
+          "file": "web2/d_9gag_home.jpg",
+          "label": "distracted",
+          "blind": true,
+          "shipped_state": "distracted",
+          "binary_state": "distracted",
+          "binary_reason": "Social media and entertainment visible on screen",
+          "binary_raw": "{\"state\":\"distracted\",\"reason\":\"Social media and entertainment visible on screen\"}"
+        }
+      ]
+    }
+  }
+}
