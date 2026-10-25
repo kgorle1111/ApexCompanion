@@ -133,6 +133,14 @@ stop_reason() {  # the coach's own account of why it stopped: "user", "timer" or
     "$PY" -I -c 'import json,sys; print(json.load(open(sys.argv[1])).get("stop_reason") or "")' "$STATE" 2>/dev/null
 }
 
+coach_error() {  # exit 3: the coach's own reason for giving up, one printable line, or "" if it left none
+    # state "error" guard: otherwise last_line is the last thing the persona said, not a reason.
+    "$PY" -I -c 'import json,sys
+d = json.load(open(sys.argv[1]))
+s = str(d.get("last_line") or "") if d.get("state") == "error" else ""
+print("".join(c if c.isprintable() else " " for c in s).strip()[:300])' "$STATE" 2>/dev/null
+}
+
 reset_session_files() {  # a new session must not inherit the last one's stop flag or final state
     local tmp="$APEX_HOME/.control.json.$$"
     rm -f "$STATE"
@@ -359,7 +367,14 @@ run_coach() {
     log "coach pid $mypid exited rc=$rc"
     if [ -f "$APEX_HOME/stop.$mypid" ]; then rm -f "$APEX_HOME/stop.$mypid"; return 0; fi   # stopped on purpose
     [ "$(cat "$PIDFILE" 2>/dev/null)" = "$mypid" ] && rm -f "$PIDFILE"
-    if [ "$rc" -ne 0 ]; then
+    local why=""; [ "$rc" -eq 3 ] && why="$(coach_error)"
+    if [ -n "$why" ]; then
+        dialog "The coach stopped itself after repeated errors:
+
+$why
+
+Open ApexCompanion to try again. Full log: $LOGDIR/apex.log" "OK" "OK" >/dev/null
+    elif [ "$rc" -ne 0 ]; then
         dialog "The coach stopped unexpectedly. Last lines of its log:
 
 $(tail -n 4 "$LOGDIR/apex.log" | cut -c1-200)
