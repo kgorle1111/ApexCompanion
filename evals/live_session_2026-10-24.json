@@ -1,0 +1,50 @@
+{
+  "session": "8a3f575f",
+  "started": 1792885647.331118,
+  "persona": "closer",
+  "mode": "screen",
+  "duration_s": 3119.4,
+  "checks": 624,
+  "focus_pct": 98.4,
+  "roasts": 3,
+  "praise": 0,
+  "rule_decided": 0,
+  "guard_fired": 0,
+  "unparsed": 0,
+  "errors": 0,
+  "errors_by_stage": {},
+  "latency": {
+    "rules_s": {
+      "p50": 0.087,
+      "p95": 0.208,
+      "n": 624
+    },
+    "capture_s": {
+      "p50": 0.177,
+      "p95": 0.222,
+      "n": 624
+    },
+    "classify_s": {
+      "p50": 0.97,
+      "p95": 1.26,
+      "n": 624
+    },
+    "roast_s": {
+      "p50": 0.732,
+      "p95": 0.793,
+      "n": 3
+    },
+    "total_s": {
+      "p50": 1.289,
+      "p95": 1.602,
+      "n": 624
+    }
+  },
+  "load_s": 4.44,
+  "peak_rss_mb": 9584.0,
+  "ended_cleanly": true,
+  "interval_s": 5.0,
+  "cooldown_s": 30,
+  "hardware": "M3 Max",
+  "note": "author's own screen; reliability soak, not an accuracy test; checks are unlabeled"
+}
