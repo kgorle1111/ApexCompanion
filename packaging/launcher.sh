@@ -38,7 +38,14 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:
 export UV_PYTHON_INSTALL_DIR="$APEX_HOME/python" UV_PYTHON_PREFERENCE=only-managed UV_CACHE_DIR="$APEX_HOME/uv-cache"
 
 mkdir -p "$APEX_HOME" "$LOGDIR" || exit 1
-exec 3>>"$LOGDIR/launcher.log"
+
+rotate_logs() {  # one generation over 1 MB; apex.log holds every spoken line, so it must not grow forever
+    local f
+    for f in "$LOGDIR/apex.log" "$LOGDIR/launcher.log"; do
+        [ "$(stat -f %z "$f" 2>/dev/null || echo 0)" -gt 1048576 ] && mv -f "$f" "$f.1"
+    done
+    ( umask 077; touch "$LOGDIR/apex.log" "$LOGDIR/launcher.log" )   # recreated files stay owner-only
+}
 
 log() {
     printf '%s [%s] %s\n' "$(date '+%F %T')" "$$" "$*" >&3
@@ -383,5 +390,8 @@ start_flow() {
     run_coach
 }
 
+# Not while a coach runs: its launcher still writes both logs through open fds and tails apex.log.
+coach_pid >/dev/null || rotate_logs
+exec 3>>"$LOGDIR/launcher.log"   # fd 3 is only used inside functions, so it opens after rotation
 log "launcher start (host=${APEX_HOST:-0}, nonint=$NONINT, home=$APEX_HOME)"
 if pid="$(coach_pid)"; then control_menu "$pid"; else start_flow; fi
