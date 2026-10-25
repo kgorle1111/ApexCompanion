@@ -27,17 +27,32 @@ class EventLog:
 
     def __init__(self, path: Path, session: str):
         self.session = session
+        self.warned = False
         # Owner-only from creation: even trimmed, the log says which apps and sites were in front and when.
         self.f = os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), "a")
 
     def emit(self, event: str, **fields) -> None:
-        self.f.write(
-            json.dumps({"t": time.time(), "schema": SCHEMA, "session": self.session, "event": event, **fields}) + "\n"
-        )
-        self.f.flush()
+        try:
+            self.f.write(
+                json.dumps({"t": time.time(), "schema": SCHEMA, "session": self.session, "event": event, **fields})
+                + "\n"
+            )
+            self.f.flush()
+        except OSError as e:  # disk full: losing log lines beats losing the session
+            self._warn(e)
 
     def close(self) -> None:
-        self.f.close()
+        try:
+            self.f.close()  # flushes whatever a full disk refused earlier, so it can raise too
+        except OSError as e:
+            self._warn(e)
+
+    def _warn(self, e: OSError) -> None:
+        if not self.warned:
+            self.warned = True
+            print(
+                f"warning: session log write failed ({e!r}); coaching continues unlogged", file=sys.stderr, flush=True
+            )
 
 
 def prune_logs(log_dir: Path, keep_days: float) -> int:
