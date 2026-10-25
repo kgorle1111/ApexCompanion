@@ -34,12 +34,22 @@ def run_main(
     clock_step=0.0,
     on_start=None,
     on_sleep=None,
+    verdicts=(),
+    warm=WORKING,
+    permission=lambda: True,
+    hang_say=False,
 ):
     """Run main() for `checks` sleeps (one per check or paused tick). `shots` scripts screencapture: True writes a
     frame, False fails. The wall clock is frozen except that each sleep advances it by `clock_step` seconds.
-    `on_start` runs once the model is loaded (after stale control files are cleared); `on_sleep(n)` before sleep n."""
-    seen = {"screencapture": [], "classify": [], "roast_prompt": [], "notify": [], "say": []}
-    shots = list(shots)
+    `on_start` runs once the model is loaded (after stale control files are cleared); `on_sleep(n)` before sleep n.
+    `hang_say` makes say ignore everything but a kill.
+    SystemExit is caught into seen["exit"]; tempfile.tempdir is per-test, so the lock and sweep never touch TMPDIR.
+    `verdicts` scripts classify (an Exception is raised) before falling back to `verdict`; so does a list `url`.
+    `permission` stands in for the CoreGraphics preflight.
+    `warm` is what the warm-up check returns."""
+    seen = {"screencapture": [], "classify": [], "roast_prompt": [], "notify": [], "say": [], "killed": []}
+    shots, verdicts = list(shots), list(verdicts)
+    urls = list(url) if isinstance(url, list) else None
 
     def fake_run(cmd, **kw):
         if cmd[0] == "screencapture":
@@ -57,12 +67,22 @@ def run_main(
         def poll(self):
             return 0
 
-        def wait(self):
+        def wait(self, timeout=None):
+            if hang_say:
+                if timeout is None:
+                    raise AssertionError("waited on say with no timeout: a wedged say would hang forever")
+                raise subprocess.TimeoutExpired("say", timeout)
             return 0
+
+        def kill(self):
+            seen["killed"].append(True)
 
     def classify(path):
         seen["classify"].append((path, Path(path).exists()))
-        return dict(verdict)
+        v = verdicts.pop(0) if verdicts else verdict
+        if isinstance(v, Exception):
+            raise v
+        return dict(v)
 
     fake_gemma = types.ModuleType("gemma")
     fake_gemma.MODEL_ID = "fake-model"
@@ -72,13 +92,17 @@ def run_main(
     monkeypatch.setitem(sys.modules, "gemma", fake_gemma)
     monkeypatch.setattr(apex.subprocess, "run", fake_run)
     monkeypatch.setattr(apex.subprocess, "Popen", FakeSay)
-    monkeypatch.setattr(apex, "warm_up", lambda g: None)
+    monkeypatch.setattr(apex, "warm_up", lambda g: dict(warm))
     monkeypatch.setattr(apex, "notify", lambda text, title: seen["notify"].append(text))
     monkeypatch.setattr(apex, "LOG_DIR", tmp_path / "logs")
     monkeypatch.setattr(rules, "front_app", lambda: front_app)
-    monkeypatch.setattr(rules, "front_url", lambda app: url)
+    monkeypatch.setattr(rules, "front_url", lambda app: (urls.pop(0) if len(urls) > 1 else urls[0]) if urls else url)
     monkeypatch.setattr(rules, "in_meeting", lambda app, u: meeting)
     monkeypatch.setenv("APEX_SCREEN_OK", "1")
+    monkeypatch.setattr(apex, "screen_permission", permission)
+    tmp = tmp_path / "tmp"
+    tmp.mkdir(exist_ok=True)
+    monkeypatch.setattr(apex.tempfile, "tempdir", str(tmp))
 
     clock = [time.time()]  # real "now", so files a test writes mid-run are newer than session start
     sleeps = []
@@ -99,8 +123,15 @@ def run_main(
     argv += ["--mute"] if mute else []
     argv += ["--state-dir", str(state_dir)] if state_dir else []
     monkeypatch.setattr(sys, "argv", argv + list(args))
-    apex.main()
-    (log_path,) = (tmp_path / "logs").glob("session-*.jsonl")
+    seen["exit"] = None
+    try:
+        apex.main()
+    except SystemExit as e:
+        seen["exit"] = e.code
+    logs = sorted((tmp_path / "logs").glob("session-*.jsonl"))
+    if not logs:  # refused before the session started
+        return seen
+    log_path = logs[-1]
     seen["events"] = [json.loads(line) for line in log_path.read_text().splitlines()]
     seen["log"] = [e for e in seen["events"] if e["event"] in ("check", "error")]
     seen["log_path"] = log_path

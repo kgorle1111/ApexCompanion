@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 SCHEMA = 1
-STATES = ("starting", "working", "distracted", "paused", "meeting", "stopped")
+STATES = ("starting", "working", "distracted", "paused", "meeting", "stopped", "error")
 GOAL_MAX = 120
 DEFAULTS = {"paused_until": None, "muted": False, "stop": False}
 

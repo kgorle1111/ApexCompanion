@@ -1,6 +1,8 @@
 """ApexCompanion: on-device focus coach. Gemma 4 watches the screen; a persona calls you out loud."""
 
 import argparse
+import ctypes
+import fcntl
 import json
 import os
 import platform
@@ -20,6 +22,12 @@ LOG_DIR = Path(os.environ.get("APEX_LOG_DIR") or Path(__file__).parent / "logs")
 # The packaged app redirects stdout into a log file; the screen description only goes to a live terminal.
 INTERACTIVE = sys.stdout.isatty()
 SCHEMA = 1  # bump when event fields change; report.py reads it
+SHOT_TIMEOUT_S = 15  # screencapture and sips each; a hung one must cost one check, not the session
+NOTIFY_TIMEOUT_S = 10
+SAY_TIMEOUT_S = 30  # longer than any persona line takes to speak
+BREAKER = 6  # consecutive failed or unparsed checks before the coach stops instead of faking focus
+PERMISSION_EVERY = 30  # checks between Screen Recording re-checks; revoked mid-session = wallpaper = "working"
+CORE_GRAPHICS = "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
 
 
 class EventLog:
@@ -27,17 +35,32 @@ class EventLog:
 
     def __init__(self, path: Path, session: str):
         self.session = session
+        self.warned = False
         # Owner-only from creation: even trimmed, the log says which apps and sites were in front and when.
         self.f = os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), "a")
 
     def emit(self, event: str, **fields) -> None:
-        self.f.write(
-            json.dumps({"t": time.time(), "schema": SCHEMA, "session": self.session, "event": event, **fields}) + "\n"
-        )
-        self.f.flush()
+        try:
+            self.f.write(
+                json.dumps({"t": time.time(), "schema": SCHEMA, "session": self.session, "event": event, **fields})
+                + "\n"
+            )
+            self.f.flush()
+        except OSError as e:  # disk full: losing log lines beats losing the session
+            self._warn(e)
 
     def close(self) -> None:
-        self.f.close()
+        try:
+            self.f.close()  # flushes whatever a full disk refused earlier, so it can raise too
+        except OSError as e:
+            self._warn(e)
+
+    def _warn(self, e: OSError) -> None:
+        if not self.warned:
+            self.warned = True
+            print(
+                f"warning: session log write failed ({e!r}); coaching continues unlogged", file=sys.stderr, flush=True
+            )
 
 
 def prune_logs(log_dir: Path, keep_days: float) -> int:
@@ -89,25 +112,52 @@ class Coach:
         return None
 
 
+def take_lock() -> int:
+    """Two coaches = two model copies (~22 GB) on a 16 GB Mac. flock dies with the process, even on SIGKILL."""
+    fd = os.open(Path(tempfile.gettempdir()) / "apex.lock", os.O_RDWR | os.O_CREAT, 0o600)  # TMPDIR is per-user
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        sys.exit("ApexCompanion is already running; stop it from the menu bar first.")
+    return fd
+
+
+def sweep_frames() -> int:
+    """Frames a SIGKILL or OOM kill left behind. Only safe while holding the lock: no live coach owns them."""
+    removed = 0
+    for old in Path(tempfile.gettempdir()).glob("apex_*.jpg"):
+        try:
+            old.unlink()
+            removed += 1
+        except OSError:
+            pass
+    return removed
+
+
+def screen_permission() -> bool | None:
+    """CoreGraphics' own answer, no developer tools needed. None if it can't be asked."""
+    try:
+        preflight = ctypes.CDLL(CORE_GRAPHICS).CGPreflightScreenCaptureAccess
+    except (OSError, AttributeError):
+        return None
+    preflight.restype, preflight.argtypes = ctypes.c_bool, []
+    return bool(preflight())
+
+
 def require_screen_permission() -> None:
     """Without permission screencapture still succeeds but returns only the wallpaper, so the coach
     would silently call everything 'working'. Refuse to start instead."""
     if os.environ.get("APEX_SCREEN_OK") == "1":  # the app bundle already checked via CoreGraphics
         return
-    try:
-        r = subprocess.run(
-            ["swift", "-e", "import CoreGraphics; print(CGPreflightScreenCaptureAccess())"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    ok = screen_permission()
+    if ok is None:  # warn, don't brick: a missing framework symbol isn't proof the permission is missing
         print(
-            "warning: couldn't verify Screen Recording permission (no swift); if every check says 'other', grant it.",
+            "warning: couldn't verify Screen Recording permission; if every check says 'other', grant it.",
             file=sys.stderr,
         )
         return
-    if r.stdout.strip() == "false":
+    if not ok:
         sys.exit(
             "Screen Recording permission is missing for this terminal app: screenshots would be "
             "wallpaper only.\nGrant it in System Settings → Privacy & Security → Screen Recording, "
@@ -115,17 +165,19 @@ def require_screen_permission() -> None:
         )
 
 
-def warm_up(gemma) -> None:
+def warm_up(gemma) -> dict:
     from PIL import Image
 
     path = str(Path(tempfile.gettempdir()) / "apex_warmup.jpg")
     Image.new("RGB", (64, 64), "white").save(path)
-    gemma.classify(path)
-    Path(path).unlink(missing_ok=True)
+    try:
+        return gemma.classify(path)
+    finally:
+        Path(path).unlink(missing_ok=True)
 
 
 def capture(path: str) -> str:
-    r = subprocess.run(["screencapture", "-x", "-t", "jpg", path], capture_output=True)
+    r = subprocess.run(["screencapture", "-x", "-t", "jpg", path], capture_output=True, timeout=SHOT_TIMEOUT_S)
     if r.returncode != 0 or not Path(path).exists() or Path(path).stat().st_size == 0:
         # Not sys.exit: SystemExit escapes the loop's `except Exception`, and a locked screen or sleeping
         # display fails capture transiently; that must skip one check, not end the session.
@@ -133,27 +185,31 @@ def capture(path: str) -> str:
             "screencapture failed. Grant Screen Recording to this terminal app "
             "(System Settings → Privacy & Security → Screen Recording), then restart it."
         )
-    subprocess.run(["sips", "-Z", str(SHOT_MAX_PX), path], capture_output=True, check=True)
+    subprocess.run(["sips", "-Z", str(SHOT_MAX_PX), path], capture_output=True, check=True, timeout=SHOT_TIMEOUT_S)
     return path
 
 
 def notify(text: str, title: str) -> None:
     # Model text goes in as argv, never spliced into AppleScript source.
-    subprocess.run(
-        [
-            "osascript",
-            "-e",
-            "on run argv",
-            "-e",
-            "display notification (item 1 of argv) with title (item 2 of argv)",
-            "-e",
-            "end run",
-            "--",
-            text,
-            title,
-        ],  # "--": a line starting with "-" would otherwise parse as an osascript flag
-        capture_output=True,
-    )
+    try:
+        subprocess.run(
+            [
+                "osascript",
+                "-e",
+                "on run argv",
+                "-e",
+                "display notification (item 1 of argv) with title (item 2 of argv)",
+                "-e",
+                "end run",
+                "--",
+                text,
+                title,
+            ],  # "--": a line starting with "-" would otherwise parse as an osascript flag
+            capture_output=True,
+            timeout=NOTIFY_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:  # a missed banner, never a dead session
+        print("output failed: notification timed out", file=sys.stderr, flush=True)
 
 
 class Voice:
@@ -165,8 +221,16 @@ class Voice:
         if self.mute:
             return
         if self.proc and self.proc.poll() is None:
-            self.proc.wait()  # never talk over itself
+            self.finish()  # never talk over itself
         self.proc = subprocess.Popen(["say", "-v", self.voice, "-r", str(self.rate), "--", text])
+
+    def finish(self) -> None:
+        if not self.proc:
+            return
+        try:
+            self.proc.wait(timeout=SAY_TIMEOUT_S)
+        except subprocess.TimeoutExpired:  # a wedged audio stack must not wedge the loop
+            self.proc.kill()
 
 
 def _graceful_term(signum, frame) -> None:
@@ -211,8 +275,14 @@ def main() -> None:
     voice = Voice(p["voice"], p["rate"], args.mute)
     goal = control.clean_goal(args.goal)
 
+    lock_fd, swept, screen_ok = None, 0, None
     if not args.image:
+        lock_fd = take_lock()
+        swept = sweep_frames()
         require_screen_permission()
+        # Baseline for the mid-session re-check: if this process can't see the grant even at start (the packaged
+        # app checks via its own bundle), a False later says nothing about revocation.
+        screen_ok = screen_permission()
 
     LOG_DIR.mkdir(exist_ok=True)
     pruned = prune_logs(LOG_DIR, args.log_days) if args.log_days > 0 else 0
@@ -224,7 +294,7 @@ def main() -> None:
     started = last_mark = focused_s = 0.0
     ends_at: float | None = None
     last_state, last_line, stop_reason = "starting", None, None
-    errors = roasts = praises = guarded = 0
+    errors = roasts = praises = guarded = bad_run = 0
 
     def publish(state: str) -> None:
         nonlocal last_state
@@ -256,6 +326,19 @@ def main() -> None:
         except OSError as e:  # the menu bar goes stale, but the session itself is fine
             print(f"state write failed: {e!r}", file=sys.stderr, flush=True)
 
+    def trip(cause: str, error: str) -> None:
+        """Alive-but-broken must not sound like focus: stop loudly instead of logging 'working' forever.
+        `cause` is shown after "Stopped: " by the menu bar and launcher: one line, no prefix, under 120 chars."""
+        nonlocal stop_reason, last_line
+        stop_reason, last_line = "error", cause
+        print(f"stopped: {cause}", file=sys.stderr, flush=True)
+        log.emit("error", n=n, stage="breaker", error=error[:300])
+        try:
+            notify(cause, title)
+        except OSError as e:
+            print(f"output failed: {e!r}", file=sys.stderr, flush=True)
+        publish("error")
+
     def end_reason() -> str | None:
         if ctl and ctl.current()["stop"]:
             return "user"
@@ -276,6 +359,7 @@ def main() -> None:
         python=platform.python_version(),
         macos=platform.mac_ver()[0],
         pruned_logs=pruned,
+        swept_frames=swept,
     )
     publish("starting")
     coach = Coach(args.streak, args.cooldown, args.praise_every)
@@ -291,7 +375,14 @@ def main() -> None:
         import gemma  # noqa: E402
 
         gemma.load_model()
-        warm_up(gemma)
+        warm = warm_up(gemma)
+        if warm["category"] == "unparsed":  # the coach would fail open to "working" on every check
+            print(
+                "WARNING: the model's warm-up answer didn't parse; checks may all read as 'working'.",
+                file=sys.stderr,
+                flush=True,
+            )
+            log.emit("warning", stage="warmup", raw=str(warm.get("raw", ""))[:200])
         load_s = time.perf_counter() - t0
         print(f"model ready in {load_s:.1f}s", flush=True)
         log.emit("model_ready", model=gemma.MODEL_ID, load_s=round(load_s, 2), rss_mb=peak_rss_mb())
@@ -321,6 +412,12 @@ def main() -> None:
                     time.sleep(args.interval)
                     continue
             n += 1
+            if screen_ok and n % PERMISSION_EVERY == 0 and screen_permission() is False:
+                trip(
+                    "Screen Recording permission was turned off. Turn it back on, then open ApexCompanion again.",
+                    "screen recording permission revoked",
+                )
+                break
             timing: dict[str, float] = {}
             stage = "rules"
             try:
@@ -345,9 +442,16 @@ def main() -> None:
                     timing["classify_s"] = v["latency_s"]
             except Exception as e:  # one bad frame must not end a live session
                 errors += 1
+                bad_run += 1
                 print(f"{time.strftime('%H:%M:%S')} check failed: {e!r}", file=sys.stderr, flush=True)
                 log.emit("error", n=n, stage=stage, error=repr(e)[:300])
                 last_mark = time.time()
+                if bad_run >= BREAKER:  # ...but six in a row is a broken coach, not a bad frame
+                    hint = (
+                        "Check Screen Recording permission" if stage == "capture" else "If it repeats, check the logs"
+                    )
+                    trip(f"{bad_run} checks in a row failed. {hint}, then open ApexCompanion again.", repr(e))
+                    break
                 publish(last_state)
                 if args.once:
                     break
@@ -356,6 +460,7 @@ def main() -> None:
                 continue
             finally:
                 Path(shot).unlink(missing_ok=True)  # privacy claim: no frame outlives its check
+            bad_run = bad_run + 1 if v["category"] == "unparsed" else 0
             action = coach.observe(v["state"], time.monotonic())
             if v["category"] == "meeting":
                 action = None
@@ -420,6 +525,12 @@ def main() -> None:
                 timing=timing,
             )
             publish("meeting" if v["category"] == "meeting" else v["state"])
+            if bad_run >= BREAKER:
+                trip(
+                    f"{bad_run} checks in a row got no usable answer from the model. Open ApexCompanion again.",
+                    "unparsed model output: " + str(v.get("raw_unparsed", ""))[:200],
+                )
+                break
             if args.once:
                 break
             if end_reason() is None:
@@ -429,8 +540,7 @@ def main() -> None:
     finally:
         signal.signal(signal.SIGTERM, signal.SIG_IGN)  # a second TERM must not cut session_end short
         Path(shot).unlink(missing_ok=True)
-        if voice.proc:
-            voice.proc.wait()
+        voice.finish()
         checks = coach.working_checks + coach.distracted_checks
         focus_pct = 100 * coach.working_checks / checks if checks else 0
         log.emit(
@@ -446,12 +556,18 @@ def main() -> None:
             stop_reason=stop_reason,
         )
         log.close()
-        publish("stopped")
+        publish("error" if stop_reason == "error" else "stopped")  # the launcher shows last_line after exit 3
         signal.signal(signal.SIGTERM, prev_term)
+        if lock_fd is not None:
+            os.close(lock_fd)
         print(
             f"\nsession {(time.time() - started) / 60 if started else 0:.1f} min · {checks} checks · "
             f"focused {focus_pct:.0f}% · call-outs {coach.strikes}"
         )
+    if stop_reason == "error":
+        sys.exit(3)
+    if args.once and bad_run:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
