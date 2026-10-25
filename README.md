@@ -335,12 +335,17 @@ Measured on an M3 Max, `mlx-community/gemma-4-e4b-it-8bit`, `mlx-vlm 0.7.10`, of
 | Vision classify call only, warm | **p50 0.87 s, p95 0.96 s** (batch 1); **p50 0.78 s, p95 0.94 s** (batch 2) | model already loaded; excludes `screencapture` and resize |
 | Roast generation | **0.57 to 0.79 s** | |
 | Peak memory | **11.3 GB** footprint | `/usr/bin/time -l` over a 306-check soak; steady state 8.6–8.9 GB, no growth seen in 5 min |
-| End-to-end check | 2 distracted checks → spoken roast | worked once, on a synthetic image |
+| End-to-end check | 2 distracted checks → spoken roast | ran end to end on a real desktop in the 52-minute live soak below (3 roasts) |
+| **Live soak** (one real session on the author's own screen, Oct 24) | **52 min, 624 checks** at a 5 s interval (default is 10 s), **0 errors, 0 unparseable outputs** | reliability soak, not an accuracy test: the checks are unlabeled; source: [`evals/live_session_2026-10-24.json`](evals/live_session_2026-10-24.json) |
+| Live soak, end to end per check | **p50 1.29 s, p95 1.60 s** | rules + `screencapture` + classify; n = 624 |
+| Live soak, vision classify | **p50 0.97 s, p95 1.26 s** | n = 624 |
+| Live soak, capture | **0.18 s** p50 | `screencapture` + resize |
+| Live soak, roasts | **3** | the author opened cat videos to test it |
 | **Batch 2, blind** (23 pages, never tuned on) | **15/16** clear-cut (Wilson 95% interval about 72% to 99%), **21/23** overall, 0 false roasts on clear-cut pages | the headline; captured after prompt tuning finished; labels hand-checked by the author (Oct 24), not an independent reviewer |
 | Batch 2 distracted recall, clear-cut | **6/7** | exactly at the 0.85 gate |
 | Batch 1, tuning set (28 pages, used while tuning) | **25/25** clear-cut, **26/28** overall | not a fair test on its own |
 | Both batches pooled | **40/41** clear-cut across 51 pages (95% interval lower bound about 87%); distracted recall **17/18** | secondary; one false roast, on a page labeled ambiguous |
-| Real-world time from opening a distraction to the roast | not measured yet | by design at least 2 checks at a 10 s interval, plus 0.6 to 0.8 s to write the roast |
+| Real-world time from opening a distraction to the roast | about 2 checks (2 × interval) plus about 0.7 s to write the roast | by design, not stopwatch-measured: about 20 s at the default 10 s interval, about 10 s at the soak's 5 s |
 | Battery drain per hour | not measured yet | |
 
 Fixed settings (configuration, not measurements): 10 s check interval, 2 consecutive distracted checks before a roast, 60 s cooldown between roasts, screenshots downscaled to 1024 px on the long side.
@@ -366,7 +371,7 @@ Pages a reasonable person could call either way are labeled ambiguous and report
 
 **Pooled:** 40/41 clear-cut across 51 real pages (95% interval lower bound about 87%). That is a small set, not a general accuracy figure.
 
-**Checking that the eval can fail.** We broke the category map on purpose and re-ran it (mutation testing). Moving `entertainment_video` into the working list turned the eval red on the distracted-recall gate (threshold 0.85). Moving `coding` into the distracted list turned it red with 6 false roasts. The first version of the gate checked accuracy only, and it did not catch the first mutation, so we added the recall gate.
+**Checking that the eval can fail.** We broke the category map on purpose and re-ran it (mutation testing). Moving `entertainment_video` into the working list turned the eval red on the distracted-recall gate (threshold 0.85). Moving `coding` into the distracted list turned it red with 6 false roasts. The first version of the gate checked accuracy only, and it did not catch the first mutation: with `entertainment_video` mapped to working, accuracy was still **21/23 (91.3%)**, so the eval passed. We added the recall gate; on the same mutation, distracted recall was **9/11 (82%)**, under the 0.85 bar, so it went red. Details in [`evals/iterations.md`](evals/iterations.md).
 
 ## Logs and observability
 
@@ -396,7 +401,7 @@ The menu bar and the coach talk through two small local files, `state.json` and 
 
 ## Limitations
 
-- **Web pages only.** The eval is 51 real web pages captured in a headless browser. No native-app frames (VS Code, the terminal, the native Spotify app, games) and no real desktop frames were tested. Your site list can cover a native app by name.
+- **Web pages only in the accuracy eval.** The accuracy eval is 51 real web pages captured in a headless browser: no native-app frames (VS Code, the terminal, the native Spotify app, games) and no desktop frames. The 52-minute live soak did run on a real desktop, but its checks are unlabeled, so it measures reliability and latency, not accuracy. Your site list can cover a native app by name.
 - **Fail-open categories hide misses.** Anything filed under "other", or misfiled into a working category, counts as working and is never roasted. In the blind batch, a Shorts clip went to `educational_video` and a Page Six gossip page to `news_reading`. The built-in Shorts rule now covers the first case in supported browsers.
 - **Small eval, one labeler.** 16 blind clear-cut cases is a small set; one miss is about 6 points. The labeler is the author: batch-2 labels were hand-checked by the author (Oct 24), but no independent reviewer has checked either batch.
 - **Not reproducible from the repo.** Labels and results are committed; the screenshots are not (third-party pages).
