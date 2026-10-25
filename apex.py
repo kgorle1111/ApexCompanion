@@ -1,6 +1,7 @@
 """ApexCompanion: on-device focus coach. Gemma 4 watches the screen; a persona calls you out loud."""
 
 import argparse
+import fcntl
 import json
 import os
 import platform
@@ -105,6 +106,29 @@ class Coach:
         if self.praise_every and self.working_run % self.praise_every == 0:
             return "praise"
         return None
+
+
+def take_lock() -> int:
+    """Two coaches = two model copies (~22 GB) on a 16 GB Mac. flock dies with the process, even on SIGKILL."""
+    fd = os.open(Path(tempfile.gettempdir()) / "apex.lock", os.O_RDWR | os.O_CREAT, 0o600)  # TMPDIR is per-user
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        sys.exit("ApexCompanion is already running; stop it from the menu bar first.")
+    return fd
+
+
+def sweep_frames() -> int:
+    """Frames a SIGKILL or OOM kill left behind. Only safe while holding the lock: no live coach owns them."""
+    removed = 0
+    for old in Path(tempfile.gettempdir()).glob("apex_*.jpg"):
+        try:
+            old.unlink()
+            removed += 1
+        except OSError:
+            pass
+    return removed
 
 
 def require_screen_permission() -> None:
@@ -241,7 +265,10 @@ def main() -> None:
     voice = Voice(p["voice"], p["rate"], args.mute)
     goal = control.clean_goal(args.goal)
 
+    lock_fd, swept = None, 0
     if not args.image:
+        lock_fd = take_lock()
+        swept = sweep_frames()
         require_screen_permission()
 
     LOG_DIR.mkdir(exist_ok=True)
@@ -306,6 +333,7 @@ def main() -> None:
         python=platform.python_version(),
         macos=platform.mac_ver()[0],
         pruned_logs=pruned,
+        swept_frames=swept,
     )
     publish("starting")
     coach = Coach(args.streak, args.cooldown, args.praise_every)
@@ -477,6 +505,8 @@ def main() -> None:
         log.close()
         publish("stopped")
         signal.signal(signal.SIGTERM, prev_term)
+        if lock_fd is not None:
+            os.close(lock_fd)
         print(
             f"\nsession {(time.time() - started) / 60 if started else 0:.1f} min · {checks} checks · "
             f"focused {focus_pct:.0f}% · call-outs {coach.strikes}"

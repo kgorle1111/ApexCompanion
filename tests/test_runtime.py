@@ -2,6 +2,8 @@
 
 import os
 import subprocess
+import sys
+import tempfile
 import time
 
 import pytest
@@ -94,3 +96,94 @@ def test_session_end_does_not_wait_forever_on_say(monkeypatch, tmp_path):
     seen = run_main(monkeypatch, tmp_path, checks=1, verdict=distracted, mute=False, hang_say=True)
     assert seen["say"] == ["Back to work."] and seen["killed"] == [True]
     assert seen["events"][-1]["event"] == "session_end"
+
+
+# ---- one coach at a time
+
+
+def test_second_coach_is_refused(monkeypatch, tmp_path):
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    fd = apex.take_lock()
+    try:
+        with pytest.raises(SystemExit, match="already running; stop it from the menu bar first"):
+            apex.take_lock()
+    finally:
+        os.close(fd)
+    os.close(apex.take_lock())  # free again once the holder lets go
+
+
+def test_lock_held_by_another_process_dies_with_it_even_on_sigkill(monkeypatch, tmp_path):
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import fcntl, os, sys, time; fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT); "
+            "fcntl.flock(fd, fcntl.LOCK_EX); print('locked', flush=True); time.sleep(30)",
+            str(tmp_path / "apex.lock"),
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout.readline().strip() == "locked"
+        with pytest.raises(SystemExit, match="already running"):
+            apex.take_lock()
+    finally:
+        holder.kill()
+        holder.wait(timeout=5)
+    os.close(apex.take_lock())  # no stale-pidfile cleanup needed
+
+
+def test_running_coach_blocks_a_second_main(monkeypatch, tmp_path):
+    tmp = tmp_path / "tmp"
+    tmp.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp))
+    fd = apex.take_lock()
+    try:
+        seen = run_main(monkeypatch, tmp_path, checks=1)
+    finally:
+        os.close(fd)
+    assert "already running" in str(seen["exit"])
+    assert seen["classify"] == [] and not (tmp_path / "logs").exists()  # refused before the model or a log
+
+
+def test_lock_is_released_when_the_session_ends(monkeypatch, tmp_path):
+    first = run_main(monkeypatch, tmp_path, checks=1)
+    second = run_main(monkeypatch, tmp_path, checks=1)
+    assert first["exit"] is None and second["exit"] is None
+
+
+def test_replay_mode_takes_no_lock(monkeypatch, tmp_path):
+    tmp = tmp_path / "tmp"
+    tmp.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp))
+    fd = apex.take_lock()
+    img = tmp_path / "frame.jpg"
+    img.write_bytes(b"\xff\xd8 frame")
+    try:
+        seen = run_main(monkeypatch, tmp_path, checks=5, args=["--image", str(img)])
+    finally:
+        os.close(fd)
+    assert seen["exit"] is None and len(seen["classify"]) == 1
+
+
+def test_startup_sweeps_frames_a_killed_coach_left_behind(monkeypatch, tmp_path):
+    tmp = tmp_path / "tmp"
+    tmp.mkdir()
+    for name in ("apex_k1l13d.jpg", "apex_warmup.jpg", "holiday.jpg"):
+        (tmp / name).write_bytes(b"\xff\xd8")
+    seen = run_main(monkeypatch, tmp_path, checks=1)
+    assert sorted(p.name for p in tmp.iterdir()) == ["apex.lock", "holiday.jpg"]
+    assert seen["events"][0]["swept_frames"] == 2
+
+
+def test_replay_mode_never_sweeps(monkeypatch, tmp_path):
+    # No lock in replay mode, so a live screen coach may own that frame right now.
+    tmp = tmp_path / "tmp"
+    tmp.mkdir()
+    (tmp / "apex_live.jpg").write_bytes(b"\xff\xd8")
+    img = tmp_path / "frame.jpg"
+    img.write_bytes(b"\xff\xd8 frame")
+    run_main(monkeypatch, tmp_path, checks=1, args=["--image", str(img)])
+    assert (tmp / "apex_live.jpg").exists()

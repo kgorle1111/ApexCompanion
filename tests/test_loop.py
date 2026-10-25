@@ -39,7 +39,8 @@ def run_main(
     """Run main() for `checks` sleeps (one per check or paused tick). `shots` scripts screencapture: True writes a
     frame, False fails. The wall clock is frozen except that each sleep advances it by `clock_step` seconds.
     `on_start` runs once the model is loaded (after stale control files are cleared); `on_sleep(n)` before sleep n.
-    `hang_say` makes say ignore everything but a kill."""
+    `hang_say` makes say ignore everything but a kill.
+    SystemExit is caught into seen["exit"]; tempfile.tempdir is per-test, so the lock and sweep never touch TMPDIR."""
     seen = {"screencapture": [], "classify": [], "roast_prompt": [], "notify": [], "say": [], "killed": []}
     shots = list(shots)
 
@@ -88,6 +89,9 @@ def run_main(
     monkeypatch.setattr(rules, "front_url", lambda app: url)
     monkeypatch.setattr(rules, "in_meeting", lambda app, u: meeting)
     monkeypatch.setenv("APEX_SCREEN_OK", "1")
+    tmp = tmp_path / "tmp"
+    tmp.mkdir(exist_ok=True)
+    monkeypatch.setattr(apex.tempfile, "tempdir", str(tmp))
 
     clock = [time.time()]  # real "now", so files a test writes mid-run are newer than session start
     sleeps = []
@@ -108,8 +112,15 @@ def run_main(
     argv += ["--mute"] if mute else []
     argv += ["--state-dir", str(state_dir)] if state_dir else []
     monkeypatch.setattr(sys, "argv", argv + list(args))
-    apex.main()
-    (log_path,) = (tmp_path / "logs").glob("session-*.jsonl")
+    seen["exit"] = None
+    try:
+        apex.main()
+    except SystemExit as e:
+        seen["exit"] = e.code
+    logs = sorted((tmp_path / "logs").glob("session-*.jsonl"))
+    if not logs:  # refused before the session started
+        return seen
+    log_path = logs[-1]
     seen["events"] = [json.loads(line) for line in log_path.read_text().splitlines()]
     seen["log"] = [e for e in seen["events"] if e["event"] in ("check", "error")]
     seen["log_path"] = log_path
