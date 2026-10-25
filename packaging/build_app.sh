@@ -1,6 +1,7 @@
 #!/bin/bash
 # Build dist/ApexCompanion.app + dist/ApexCompanion.zip from the repo. Run from anywhere:
-#   bash packaging/build_app.sh
+#   bash packaging/build_app.sh        (on a clean, tagged commit: git tag v0.2.0)
+#   APEX_VERSION=0.0.0-test APEX_ALLOW_DIRTY=1 bash packaging/build_app.sh   (local test build)
 # Needs (build machine only): swiftc (Xcode Command Line Tools). Optional: the repo .venv with
 # Pillow for the icon (or APEX_BUILD_PY=/path/to/python). End users need none of this.
 set -euo pipefail
@@ -9,9 +10,29 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG="$ROOT/packaging"
 DIST="$ROOT/dist"
 APP="$DIST/ApexCompanion.app"
-VERSION="0.1.0"
 
-rm -rf "$APP" "$DIST/ApexCompanion.zip"
+# A release must be reproducible from its tag: no uncommitted changes, version taken from the tag.
+if [ "${APEX_ALLOW_DIRTY:-0}" != 1 ]; then
+    dirty="$(git -C "$ROOT" status --porcelain)" \
+        || { echo "error: can't read git status (not a git checkout?); set APEX_ALLOW_DIRTY=1 to build anyway" >&2; exit 1; }
+    if [ -n "$dirty" ]; then
+        echo "error: uncommitted changes; commit or stash them, or set APEX_ALLOW_DIRTY=1 for a test build:" >&2
+        echo "$dirty" >&2
+        exit 1
+    fi
+fi
+VERSION="${APEX_VERSION:-}"
+if [ -z "$VERSION" ]; then
+    tag="$(git -C "$ROOT" describe --tags --exact-match 2>/dev/null)" \
+        || { echo "error: HEAD has no tag; tag the commit, e.g. git tag v0.2.0, or set APEX_VERSION" >&2; exit 1; }
+    VERSION="${tag#v}"
+fi
+# Spliced into Info.plist XML below.
+VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$'
+[[ "$VERSION" =~ $VERSION_RE ]] || { echo "error: version '$VERSION' is not like 1.2.3 or 1.2.3-rc1" >&2; exit 1; }
+echo "→ version $VERSION"
+
+rm -rf "$APP" "$DIST/ApexCompanion.zip" "$DIST/ApexCompanion.zip.sha256"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/app"
 
 echo "→ compiling host binary"
@@ -75,5 +96,8 @@ codesign --verify --deep --strict "$APP" && echo "  signature ok"
 
 echo "→ zipping"
 (cd "$DIST" && ditto -c -k --keepParent ApexCompanion.app ApexCompanion.zip)
+# Relative name inside the file: `shasum -a 256 -c ApexCompanion.zip.sha256` works from the download folder.
+(cd "$DIST" && shasum -a 256 ApexCompanion.zip > ApexCompanion.zip.sha256)
 ls -lh "$DIST/ApexCompanion.zip"
+cat "$DIST/ApexCompanion.zip.sha256"
 echo "built $APP"
