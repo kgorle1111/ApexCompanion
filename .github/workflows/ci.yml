@@ -52,5 +52,5 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - run: bash -n packaging/launcher.sh
+      - run: bash -n packaging/launcher.sh packaging/build_app.sh
       - run: swiftc -O -target arm64-apple-macos14.0 packaging/main.swift -o "$RUNNER_TEMP/ApexCompanion"

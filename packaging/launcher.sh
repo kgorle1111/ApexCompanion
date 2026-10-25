@@ -17,6 +17,7 @@ NONINT="${APEX_NONINTERACTIVE:-0}"
 FORCE_PICK="${APEX_PICK_PERSONA:-0}"
 MODEL_ID="mlx-community/gemma-4-e4b-it-8bit"
 MODEL_CACHE_NAME="models--mlx-community--gemma-4-e4b-it-8bit"
+MODEL_REVISION="4255b21bd9a9d3fc807ef7abd80373f5e3a52a73"   # = gemma.MODEL_REVISION, which loads it cache-only
 VENV="$APEX_HOME/venv"
 PY="$VENV/bin/python"
 WORK="$APEX_HOME/app"
@@ -28,6 +29,7 @@ CONTROL="$APEX_HOME/control.json"  # written by the menu bar, read by the coach
 LOGDIR="$APEX_HOME/logs"
 LOCK="$APEX_HOME/setup.lock"
 DEPS_STAMP="mlx-vlm==0.7.10 pillow constraints-v1"
+UV_VERSION="0.11.21"                # keep in step with .github/workflows/ci.yml
 LABEL_CLOSER="The Closer — arrogant dealmaker"
 LABEL_WHIP="The Whip — cold Southern operator"
 
@@ -36,7 +38,14 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:
 export UV_PYTHON_INSTALL_DIR="$APEX_HOME/python" UV_PYTHON_PREFERENCE=only-managed UV_CACHE_DIR="$APEX_HOME/uv-cache"
 
 mkdir -p "$APEX_HOME" "$LOGDIR" || exit 1
-exec 3>>"$LOGDIR/launcher.log"
+
+rotate_logs() {  # one generation over 1 MB; apex.log holds every spoken line, so it must not grow forever
+    local f
+    for f in "$LOGDIR/apex.log" "$LOGDIR/launcher.log"; do
+        [ "$(stat -f %z "$f" 2>/dev/null || echo 0)" -gt 1048576 ] && mv -f "$f" "$f.1"
+    done
+    ( umask 077; touch "$LOGDIR/apex.log" "$LOGDIR/launcher.log" )   # recreated files stay owner-only
+}
 
 log() {
     printf '%s [%s] %s\n' "$(date '+%F %T')" "$$" "$*" >&3
@@ -124,6 +133,14 @@ stop_reason() {  # the coach's own account of why it stopped: "user", "timer" or
     "$PY" -I -c 'import json,sys; print(json.load(open(sys.argv[1])).get("stop_reason") or "")' "$STATE" 2>/dev/null
 }
 
+coach_error() {  # exit 3: the coach's own reason for giving up, one printable line, or "" if it left none
+    # state "error" guard: otherwise last_line is the last thing the persona said, not a reason.
+    "$PY" -I -c 'import json,sys
+d = json.load(open(sys.argv[1]))
+s = str(d.get("last_line") or "") if d.get("state") == "error" else ""
+print("".join(c if c.isprintable() else " " for c in s).strip()[:300])' "$STATE" 2>/dev/null
+}
+
 reset_session_files() {  # a new session must not inherit the last one's stop flag or final state
     local tmp="$APEX_HOME/.control.json.$$"
     rm -f "$STATE"
@@ -186,22 +203,34 @@ ensure_uv() {
     [ "$b" = Install ] || exit 0
     notify "Installing setup tool…"
     # UV_NO_MODIFY_PATH: don't edit the user's shell profile files; we call uv by full path.
-    curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh >&3 2>&1 \
+    # Versioned installer (redirects to that release's uv-installer.sh): the uv CI tests with, not latest.
+    # pipefail: a failed download must fail here, not feed sh an empty script that "succeeds".
+    ( set -o pipefail; curl -LsSf --max-time 120 --retry 2 "https://astral.sh/uv/$UV_VERSION/install.sh" \
+        | env UV_NO_MODIFY_PATH=1 sh ) >&3 2>&1 \
         || fail "Couldn't install the setup tool (uv). Check your internet connection and open ApexCompanion again."
     UV="$(command -v uv)" || fail "The setup tool (uv) installed but can't be found."
 }
+
+venv_fail() { rm -rf "$VENV.new"; fail "$1"; }   # the working venv, if any, is left untouched
 
 ensure_venv() {
     if [ -x "$PY" ] && [ "$(cat "$VENV/.apex-ok" 2>/dev/null)" = "$DEPS_STAMP" ]; then log "venv ok"; return 0; fi
     [ "$(free_gb)" -ge 2 ] || fail "Not enough free disk space for setup (need about 2 GB free; you have $(free_gb) GB)."
     notify "Setting up (one time, a few minutes)…"
-    log "creating venv at $VENV"
-    case "$VENV" in "$APEX_HOME"/venv) rm -rf "$VENV" ;; esac
-    "$UV" venv --python 3.12 "$VENV" >&3 2>&1 || fail "Setup failed while creating the Python engine. Check your internet connection and open ApexCompanion again."
-    "$UV" pip install --python "$PY" -c "$HERE/constraints.txt" "mlx-vlm==0.7.10" pillow >&3 2>&1 \
-        || fail "Setup failed while installing the coach's engine. Check your internet connection and open ApexCompanion again."
-    "$PY" -c "import mlx_vlm, PIL, huggingface_hub" >&3 2>&1 || fail "Setup finished but the engine doesn't load."
-    echo "$DEPS_STAMP" > "$VENV/.apex-ok"
+    # Build beside the old venv and swap only once the new one imports: a dropped connection mid-install
+    # must not leave the user with no engine. --relocatable: entry-point shebangs and activate survive the mv.
+    local new="$VENV.new" old="$VENV.old"
+    log "creating venv at $new"
+    rm -rf "$new" "$old"   # leftovers of an interrupted setup
+    "$UV" venv --relocatable --python 3.12 "$new" >&3 2>&1 \
+        || venv_fail "Setup failed while creating the Python engine. Check your internet connection and open ApexCompanion again."
+    "$UV" pip install --python "$new/bin/python" -c "$HERE/constraints.txt" "mlx-vlm==0.7.10" pillow >&3 2>&1 \
+        || venv_fail "Setup failed while installing the coach's engine. Check your internet connection and open ApexCompanion again."
+    "$new/bin/python" -c "import mlx_vlm, PIL, huggingface_hub" >&3 2>&1 || venv_fail "Setup finished but the engine doesn't load."
+    echo "$DEPS_STAMP" > "$new/.apex-ok" || venv_fail "Couldn't write to $APEX_HOME."
+    if [ -e "$VENV" ]; then mv "$VENV" "$old" || venv_fail "Couldn't replace the old Python engine in $APEX_HOME."; fi
+    mv "$new" "$VENV" || { [ -e "$old" ] && mv "$old" "$VENV"; venv_fail "Couldn't move the new Python engine into place in $APEX_HOME."; }
+    rm -rf "$old"
     "$UV" cache clean >&3 2>&1 || true   # ~850 MB of downloaded wheels; the venv doesn't need them
     log "venv ready: $("$PY" -c 'import mlx_vlm,sys;print("mlx-vlm",mlx_vlm.__version__,"python",sys.version.split()[0])')"
 }
@@ -213,18 +242,16 @@ sync_app() {
     cp "$APP_SRC"/*.py "$WORK/" || fail "Couldn't copy the app files into $WORK."
 }
 
-model_complete() {  # model_complete HUB_DIR -> 0 if every shard in the index is present
-    local snap idx shards f n=0 want
-    for snap in "$1/$MODEL_CACHE_NAME"/snapshots/*/; do
-        idx="$snap/model.safetensors.index.json"
-        [ -s "$idx" ] && [ -s "$snap/config.json" ] && [ -s "$snap/tokenizer.json" ] || continue
-        shards="$(grep -o 'model-[0-9]*-of-[0-9]*\.safetensors' "$idx" | sort -u)"
-        [ -n "$shards" ] || continue
-        want="$(echo "$shards" | head -1 | sed 's/.*-of-0*\([0-9]*\)\.safetensors/\1/')"
-        n=0
-        for f in $shards; do [ -s "$snap/$f" ] && n=$((n + 1)); done   # -s follows the blob symlink
-        [ "$n" = "$want" ] && { log "model found: $snap ($n/$want shards)"; return 0; }
-    done
+model_complete() {  # model_complete HUB_DIR -> 0 if every shard of the pinned snapshot is present
+    # Only the pinned snapshot counts: gemma.py won't load another one, however complete.
+    local snap="$1/$MODEL_CACHE_NAME/snapshots/$MODEL_REVISION" idx shards f n=0 want
+    idx="$snap/model.safetensors.index.json"
+    [ -s "$idx" ] && [ -s "$snap/config.json" ] && [ -s "$snap/tokenizer.json" ] || return 1
+    shards="$(grep -o 'model-[0-9]*-of-[0-9]*\.safetensors' "$idx" | sort -u)"
+    [ -n "$shards" ] || return 1
+    want="$(echo "$shards" | head -1 | sed 's/.*-of-0*\([0-9]*\)\.safetensors/\1/')"
+    for f in $shards; do [ -s "$snap/$f" ] && n=$((n + 1)); done   # -s follows the blob symlink
+    [ "$n" = "$want" ] && { log "model found: $snap ($n/$want shards)"; return 0; }
     return 1
 }
 
@@ -243,7 +270,7 @@ This can take 10–40 minutes depending on your internet. Keep the Mac plugged i
     MODEL_HF_HOME="$APEX_HOME/huggingface"
     # The only network use after setup: fetch the weights once. caffeinate keeps the Mac awake.
     HF_HOME="$MODEL_HF_HOME" HF_HUB_OFFLINE=0 caffeinate -i "$PY" -c \
-        "from huggingface_hub import snapshot_download; snapshot_download('$MODEL_ID')" >&3 2>&1 \
+        "from huggingface_hub import snapshot_download; snapshot_download('$MODEL_ID', revision='$MODEL_REVISION')" >&3 2>&1 \
         || fail "The download didn't finish (internet dropped?). Open ApexCompanion again to resume where it stopped."
     model_complete "$MODEL_HF_HOME/hub" || fail "The download finished but the files look incomplete. Open ApexCompanion again to retry."
     notify "Download complete."
@@ -340,7 +367,14 @@ run_coach() {
     log "coach pid $mypid exited rc=$rc"
     if [ -f "$APEX_HOME/stop.$mypid" ]; then rm -f "$APEX_HOME/stop.$mypid"; return 0; fi   # stopped on purpose
     [ "$(cat "$PIDFILE" 2>/dev/null)" = "$mypid" ] && rm -f "$PIDFILE"
-    if [ "$rc" -ne 0 ]; then
+    local why=""; [ "$rc" -eq 3 ] && why="$(coach_error)"
+    if [ -n "$why" ]; then
+        dialog "The coach stopped itself after repeated errors:
+
+$why
+
+Open ApexCompanion to try again. Full log: $LOGDIR/apex.log" "OK" "OK" >/dev/null
+    elif [ "$rc" -ne 0 ]; then
         dialog "The coach stopped unexpectedly. Last lines of its log:
 
 $(tail -n 4 "$LOGDIR/apex.log" | cut -c1-200)
@@ -378,5 +412,8 @@ start_flow() {
     run_coach
 }
 
+# Not while a coach runs: its launcher still writes both logs through open fds and tails apex.log.
+coach_pid >/dev/null || rotate_logs
+exec 3>>"$LOGDIR/launcher.log"   # fd 3 is only used inside functions, so it opens after rotation
 log "launcher start (host=${APEX_HOST:-0}, nonint=$NONINT, home=$APEX_HOME)"
 if pid="$(coach_pid)"; then control_menu "$pid"; else start_flow; fi
