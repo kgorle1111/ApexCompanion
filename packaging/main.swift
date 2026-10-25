@@ -29,13 +29,16 @@ func readJSON(_ url: URL) -> [String: Any]? {
 }
 
 /// The coach's last report, or nil when no session is live (missing, stale >60 s, or stopped).
+/// "error" is the exception: the coach gave up and exited, so it never refreshes; it stays shown
+/// until the next session's launcher deletes state.json.
 struct Live {
-    let state: String, goal: String, focusedMin: Int, muted: Bool, paused: Bool, limitMin: Int?
+    let state: String, goal: String, focusedMin: Int, muted: Bool, paused: Bool, limitMin: Int?, lastLine: String
 
     init?(_ d: [String: Any]?, now: Double = Date().timeIntervalSince1970) {
-        guard let d, let t = d["t"] as? Double, now - t <= 60,
-              let state = d["state"] as? String, state != "stopped" else { return nil }
+        guard let d, let t = d["t"] as? Double, let state = d["state"] as? String,
+              state == "error" || (now - t <= 60 && state != "stopped") else { return nil }
         self.state = state
+        lastLine = ((d["last_line"] as? String) ?? "").components(separatedBy: .controlCharacters).joined(separator: " ")
         goal = (d["goal"] as? String) ?? ""
         focusedMin = Int(((d["focused_s"] as? Double) ?? 0) / 60)
         muted = (d["muted"] as? Bool) ?? false
@@ -46,7 +49,10 @@ struct Live {
         } else { limitMin = nil }
     }
 
+    var failed: Bool { state == "error" }
+
     var title: String {
+        if failed { return "⚠︎" }
         let m = "\(focusedMin)m"
         let base: String
         switch state {
@@ -171,7 +177,13 @@ final class Host: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// The menu as (title, action) rows; "" is a separator, nil action is a disabled label.
     static func menuItems(_ live: Live?) -> [(title: String, action: Selector?)] {
         var rows: [(title: String, action: Selector?)] = []
-        if let l = live {
+        if let l = live, l.failed {
+            let why = l.lastLine.count > 60 ? l.lastLine.prefix(59) + "…" : l.lastLine
+            rows.append((why.isEmpty ? "The coach stopped after repeated errors" : "Stopped: \(why)", nil))
+            rows.append(("", nil))
+            rows.append(("Start a session…", #selector(Host.startSession)))
+            rows.append(("Start with another persona…", #selector(Host.startWithPicker)))
+        } else if let l = live {
             let goal = l.goal.count > 60 ? l.goal.prefix(59) + "…" : l.goal
             rows.append((goal.isEmpty ? "No goal set" : "Working on: \(goal)", nil))
             rows.append((l.limitMin.map { "Focused \(l.focusedMin) of \($0) min" } ?? "\(l.focusedMin) min focused", nil))
@@ -206,7 +218,8 @@ final class Host: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func quit() {
         quitting = true
-        guard coachPid() != nil || Live(readJSON(stateURL)) != nil else {
+        // A failed (exited) coach counts as no coach: there is nothing to stop.
+        guard coachPid() != nil || Live(readJSON(stateURL)).map({ !$0.failed }) == true else {
             // No coach: a launcher still in setup/dialogs must not go on to start one without us.
             children.forEach { $0.terminate() }
             NSApp.terminate(nil); return
